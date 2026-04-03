@@ -177,7 +177,7 @@ See [`eq/README.md`](eq/README.md) for full filter-by-filter breakdown and loadi
 
 ## 🔗 Related Projects
 
-- **[Custom Macropad](https://github.com/YOUR_GITHUB_USERNAME/macropad)** — dedicated system control peripheral, visible in setup photo
+- **[Custom Macropad](https://github.com/saiprashanth802/ESP32-BLE-Macropad.git)** — dedicated system control peripheral, visible in setup photo
 
 ---
 
