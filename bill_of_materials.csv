@@ -1,0 +1,17 @@
+Component,Quantity,Spec,Notes
+Toyotone TT-660 Subwoofer,2,6.5" 60W,One per speaker
+Mid-woofer driver,2,~4" 20W,One per speaker
+Dome tweeter,2,1" ~30W,One per speaker
+Class-D amp module (sub),2,~60W,One per speaker
+Class-D amp module (mid),2,~20W,One per speaker
+Class-D amp module (HF),2,~30W,One per speaker
+Passive crossover PCB,2,3-way toroidal inductors,One per speaker
+Bluetooth receiver module,2,48kHz 24-bit,One per speaker
+DC-DC converter module,2,Step-down,One per speaker
+Filter capacitors,Several,100uF 35V,Power smoothing
+2-pin AC socket,2,Mains input,One per speaker
+Rocker power switch,2,Illuminated,One per speaker
+Speaker binding posts,2,4-terminal red/black,One per speaker
+Potentiometers,6,Per-driver volume trim,3 per speaker
+Wood panels,1 set,Custom cut,Enclosure material
+Wood veneer,1 set,Side finish,Aesthetic
