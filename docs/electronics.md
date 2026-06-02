@@ -1,33 +1,99 @@
-# ⚡ Electronics
+# Electronics Documentation
 
-## Signal Chain
+## System Signal Chain
 
 ```
-Bluetooth RX (48kHz/24-bit)
-    └──► Split to 3 amp modules
-              ├──► Sub amp   ──► Crossover ──► 6.5" woofer
-              ├──► Mid amp   ──► Crossover ──► 4" mid
-              └──► HF amp    ──► Crossover ──► 1" tweeter
+Bluetooth Module (48kHz/24-bit)
+        │
+        ▼
+  Audio Splitter (1 → 3 per channel)
+        │
+   ┌────┼────┐
+   ▼    ▼    ▼
+ Vol  Vol  Vol   ← 10kΩ linear potentiometers (back panel)
+ Pot  Pot  Pot
+   │    │    │
+   ▼    ▼    ▼
+Class-D Class-D Class-D   ← one amp module per driver
+  Amp   Amp   Amp
+   │    │    │
+   ▼    ▼    ▼
+Passive Crossover Network
+   │    │    │
+   ▼    ▼    ▼
+Woofer  Mid  Tweeter
+(6.5") (4") (1" dome)
 ```
 
-## Components
+---
 
-| Component | Spec | Notes |
-|-----------|------|-------|
-| Bluetooth module | 48kHz / 24-bit | Wireless input only for now |
-| Sub amp | Class-D ~60W | Drives Toyotone TT-660 |
-| Mid amp | Class-D ~20W | Drives mid-woofer |
-| HF amp | Class-D ~30W | Drives tweeter |
-| Passive crossover | PCB with toroidal inductors | Handles band separation |
-| Filter caps | 100µF 35V | Power supply smoothing |
-| DC-DC converter | Step-down module | Regulated supply for low-power stages |
+## Bluetooth Module
 
-## Power
+| Parameter | Value |
+|---|---|
+| Sample rate | 48 kHz |
+| Bit depth | 24-bit |
+| Codec | Standard BT (SBC) — not LDAC or aptX HD |
+| Output | Stereo analog line-level |
 
-- Input: 2-pin AC mains
-- Internal conversion to DC for amp modules
-- Separate regulated rail for Bluetooth module
+> Note: The module was initially assumed to support hi-res codecs. After physical inspection and chip identification, it was confirmed as a standard BT SBC module. Documentation was corrected accordingly. Always identify chips physically before writing specs.
 
-## Future: ESP32 DSP
+---
 
-Planned upgrade: ESP32 microcontroller inserted between Bluetooth RX and amp inputs to run onboard parametric EQ / DSP — eliminating dependence on PC-side Peace EQ. Will enable standalone tuning profiles stored on the speaker itself.
+## Amplifier Modules
+
+- Type: Class D
+- Configuration: 3 modules per cabinet (tri-amplified)
+- One channel used per module (mono per driver)
+- Input: line-level from potentiometer wiper
+- Output: to passive crossover input
+
+---
+
+## Passive Crossover Network
+
+### Component List (per cabinet)
+
+| Component | Value | Purpose |
+|---|---|---|
+| Inductor L1 | (woofer LPF) | Toroidal, hand-wound |
+| Inductor L2 | (mid BPF) | Toroidal, hand-wound |
+| Capacitor C1 | (tweeter HPF) | Electrolytic |
+| Capacitor C2 | (mid HPF pole) | Electrolytic |
+| Padding R | (tweeter attenuation) | Wire-wound resistor |
+
+### Filter Slopes
+
+- 3rd-order Butterworth: −18 dB/octave slopes
+- Crossover points: (to be measured and documented after room tuning)
+
+---
+
+## Grounding
+
+Star ground topology:
+
+```
+Woofer amp GND ──────┐
+Mid amp GND ─────────┼──── Single ground point ──── AC Earth
+Tweeter amp GND ─────┘
+BT module GND ───────┘
+```
+
+No daisy-chain grounding. All returns go directly to the star point to prevent ground loops between amp channels.
+
+---
+
+## Planned Additions
+
+### AUX Input (L/R Line-Level)
+- 3.5mm TRS or RCA stereo input on back panel
+- Line-level buffer stage before the audio splitter
+- Switch or auto-detect between BT and AUX sources
+
+### ESP32-Based Onboard DSP
+- ESP32 running biquad filter chain (CMSIS-DSP or custom)
+- I2S output to a DAC module feeding the amp inputs
+- 11-band parametric EQ matching the `tight-bass.peace` preset baked in
+- Source-independent: tuning applied regardless of input (BT, AUX, or future inputs)
+- Front-panel preset switching via rotary encoder

@@ -1,17 +1,14 @@
-# 📸 Images
+# Images
 
-Add these files to this folder before final push:
+Place build photos in this folder. Recommended shots:
 
-| Filename | Description |
-|----------|-------------|
-| setup_full.jpg | Both speakers flanking monitor — full desk setup |
-| front_drivers.jpg | Front face showing tweeter / mid / subwoofer |
-| back_panel.jpg | Back panel: AC socket, binding posts, 3 knobs |
-| internals_full.jpg | Full internal shot — crossover PCB + amp modules |
-| internals_woofer.jpg | View through woofer cutout during assembly |
-| driver_sub.jpg | Toyotone TT-660 driver removed from baffle |
+| Filename | What to photograph |
+|---|---|
+| `front.jpg` | Full front view of both cabinets, drivers visible |
+| `back-panel.jpg` | Back panel — AC socket, rocker switch, binding posts, volume pots |
+| `internal.jpg` | Inside the cabinet — amp modules, crossover, wiring |
+| `crossover.jpg` | Close-up of the passive crossover network and hand-wound inductors |
+| `drivers.jpg` | Close-up of the three drivers on the front baffle |
+| `setup.jpg` | Full listening setup — both cabinets in position |
 
-Then run:
-    git add images/
-    git commit -m "Add build photos"
-    git push
+Photos should be taken before final closeup if possible. JPEG at 1080p or higher is fine.

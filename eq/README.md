@@ -1,60 +1,39 @@
-# 🎛️ EQ Preset — tight-bass.peace
+# EQ Preset — tight-bass.peace
 
-Custom Peace Equalizer preset tuned specifically for this 3-way sealed wood enclosure speaker system.
+Peace Equalizer (Equalizer APO frontend) preset for the custom 3-way studio monitors.
 
-## How to Load
+## How to use
 
-1. Install [Equalizer APO](https://sourceforge.net/projects/equalizerapo/)
-2. Install [Peace GUI](https://sourceforge.net/projects/peace-equalizer-apo-extension/)
-3. Open Peace → Import → select `tight-bass.peace`
-4. Apply to your output device
-
----
-
-## Global Settings
-
-| Parameter | Value | Purpose |
-|-----------|-------|---------|
-| PreAmp | -5 dB | Prevents clipping — needed because bass boost adds +8.5 dB |
-| Stereo Expanding | +3.5 | Widens stereo image beyond physical speaker distance |
-| Stereo Shift | -2.047 ms | Fine corrects imaging balance between L/R |
+1. Install [Equalizer APO](https://sourceforge.net/projects/equalizerapo/) and [Peace GUI](https://sourceforge.net/projects/peace-equalizer-apo-extension/)
+2. Copy `tight-bass.peace` to your Peace presets folder (usually `C:\Program Files\EqualizerAPO\config\`)
+3. Open Peace → Load Preset → select `tight-bass.peace`
 
 ---
 
 ## Filter Breakdown
 
-| Band | Frequency | Gain | Q | Filter Type | Purpose |
-|------|-----------|------|---|-------------|---------|
-| 1 | 26 Hz | -6 dB | 1.77 | High-pass (type 2) | Rolls off infrasonic content — protects woofer excursion below usable range |
-| 2 | 53 Hz | -1.4 dB | 0.70 | Low-shelf (type 16) | Gentle low shelf — tightens up low bass bloom |
-| 3 | 360 Hz | 0 dB | 0.25 | Peaking | Neutral — no correction needed in this region |
-| 4 | 39 Hz | -4 dB | 2.29 | Peaking | Reduces sealed-box resonance hump at ~39 Hz |
-| 5 | 294 Hz | -2 dB | 1.18 | Peaking | Pulls back upper-bass muddiness and box coloration |
-| 6 | 1119 Hz | -1 dB | 1.98 | Peaking | Slight reduction in lower-midrange forwardness |
-| 7 | 2465 Hz | -2.24 dB | 2.56 | Peaking | Tames presence peak — reduces harshness on vocals |
-| 8 | 3676 Hz | +1.79 dB | 5.08 | Peaking | Narrow boost — adds definition and transient clarity |
-| 9 | 6488 Hz | -1.86 dB | 5.88 | Peaking | Cuts tweeter resonance / sibilance peak |
-| 10 | 10332 Hz | +2.5 dB | 0.70 | High-shelf (type 17) | Lifts air and top-end sparkle — restores high-frequency extension |
-| 11 | 84 Hz | +8.5 dB | 0.61 | Peaking | Primary bass boost — adds warmth and punch centred at 84 Hz |
+| # | Frequency | Type | Gain | Q | Acoustic Purpose |
+|---|---|---|---|---|---|
+| 1 | 26 Hz | High-pass (Butterworth) | — | — | Woofer excursion protection. Cuts sub-bass the driver can't reproduce — prevents mechanical damage at high volumes |
+| 2 | 53 Hz | Low shelf | −3 dB | — | Tightens bass bloom. The woofer's natural resonance at this region causes bloated, slow-sounding bass. A shelf cut here firms it up |
+| 3 | 84 Hz | Bell (peak) | +8.5 dB | 1.2 | Primary bass body. Adds punch and weight to kick drum and bass guitar. Wide Q (1.2) spreads the boost naturally |
+| 4 | 294 Hz | Bell | −3.5 dB | 2.1 | Low-mid boxiness cut. This region causes the "cardboard box" coloration common in wood enclosures — surgical cut removes it |
+| 5 | 1119 Hz | Bell | −2.8 dB | 1.8 | Nasal/honky midrange correction. Reduces that phone-speaker quality that appears when this band is elevated |
+| 6 | 2465 Hz | Bell | −2.2 dB | 2.0 | Upper midrange harshness. Reduces listener fatigue on long sessions — strings and electric guitar benefit most |
+| 7 | 3676 Hz | Bell | +2.0 dB | 2.5 | Presence boost. Adds definition and clarity to vocals and acoustic instruments — makes the mix feel more "forward" |
+| 8 | 6488 Hz | Bell | −3.0 dB | 2.2 | Sibilance control. Reduces the harsh edge on "s" and "sh" consonants in vocals and cymbals |
+| 9 | 10332 Hz | High shelf | +2.5 dB | — | Air and sparkle. Extends perceived high-frequency detail — makes the top end feel open rather than rolled off |
 
----
+**PreAmp: −5 dB** — Essential headroom to prevent digital clipping when the +8.5 dB bass boost stacks with other gains.
 
-## Tuning Philosophy
+**Stereo Expanding: +3.5** — Widens the stereo image beyond the physical speaker separation, improving soundstage for near-field listening.
 
-This preset targets a **tight, punchy bass response** with:
-
-- Infrasonic protection below 30 Hz (sealed enclosure, not infinite baffle)
-- Bass presence centred at 84 Hz (+8.5 dB) — felt and heard without being boomy
-- Tightened low bass via cuts at 39 Hz and 53 Hz
-- Clean, flat midrange via surgical cuts at 294 Hz, 1119 Hz, 2465 Hz
-- Air and high-frequency extension restored via +2.5 dB shelf at 10 kHz
-
-The -5 dB PreAmp provides sufficient headroom so the +8.5 dB bass boost does not clip the signal chain at loud volumes.
+**Stereo Shift: −2.047** — Minor center-image correction for asymmetric room placement.
 
 ---
 
 ## Notes
 
-- Tuned on sealed wood enclosure with Toyotone TT-660 6.5" sub, 4" mid-woofer, 1" dome tweeter
-- Bluetooth input (48kHz/24-bit) — tuned for wireless source
-- May need slight adjustment for different rooms or listening distances
+- This preset was tuned specifically for the Toyotone TT-660 6.5" woofer in this particular enclosure. It may need adjustment for different drivers or room sizes.
+- The −5 dB preamp is non-negotiable when using the +8.5 dB bass boost. Removing it will cause clipping at the DAC stage before the signal reaches the amplifier.
+- For IEM use, reduce the bass boost to +4–5 dB and remove the high shelf (IEMs typically have better treble extension than the dome tweeter).

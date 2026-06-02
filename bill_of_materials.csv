@@ -1,17 +1,21 @@
-Component,Quantity,Spec,Notes
-Toyotone TT-660 Subwoofer,2,6.5" 60W,One per speaker
-Mid-woofer driver,2,~4" 20W,One per speaker
-Dome tweeter,2,1" ~30W,One per speaker
-Class-D amp module (sub),2,~60W,One per speaker
-Class-D amp module (mid),2,~20W,One per speaker
-Class-D amp module (HF),2,~30W,One per speaker
-Passive crossover PCB,2,3-way toroidal inductors,One per speaker
-Bluetooth receiver module,2,48kHz 24-bit,One per speaker
-DC-DC converter module,2,Step-down,One per speaker
-Filter capacitors,Several,100uF 35V,Power smoothing
-2-pin AC socket,2,Mains input,One per speaker
-Rocker power switch,2,Illuminated,One per speaker
-Speaker binding posts,2,4-terminal red/black,One per speaker
-Potentiometers,6,Per-driver volume trim,3 per speaker
-Wood panels,1 set,Custom cut,Enclosure material
-Wood veneer,1 set,Side finish,Aesthetic
+Component,Model/Spec,Qty,Per Cabinet,Source,Notes
+Woofer,Toyotone TT-660 6.5" 60W 8Ω,2,1,DIYAudioCart,Main low-frequency driver
+Mid-woofer,4" mid-woofer 8Ω,2,1,DIYAudioCart,Midrange driver
+Tweeter,1" dome tweeter 8Ω,2,1,DIYAudioCart,High-frequency driver
+Class-D amp module,Mono Class D,6,3,Robu.in,One per driver per cabinet
+Toroidal inductor (woofer LPF),Hand-wound to target inductance,2,1,DIY (hand-wound),Wound on toroidal core with calculated turns count
+Toroidal inductor (mid BPF),Hand-wound to target inductance,2,1,DIY (hand-wound),Matched DCR to stereo partner
+Electrolytic capacitor (HPF),Value per crossover calc,4,2,Evelta,Crossover filter poles
+Padding resistor (tweeter),Wire-wound,2,1,Evelta,Sensitivity matching — tweeter attenuation
+Volume potentiometer,10kΩ linear,6,3,Robu.in,One per driver — back panel bracket
+AC socket,2-pin mains,2,1,Local,230V India standard
+Illuminated rocker switch,250V rated,2,1,Local,Mains switching
+Binding posts,4-terminal,2,1,DIYAudioCart,Speaker terminals
+Bluetooth module,Standard BT 48kHz/24-bit,2,1,—,SBC codec — not LDAC or aptX HD
+SMPS module,Mains to amp rail voltage,2,1,Robu.in,Internal power supply
+MDF board,18mm,—,—,Local hardware,Enclosure panels
+Veneer sheet,—,—,—,Local hardware,Cabinet finish
+Silicone caulk,—,—,—,Local hardware,Enclosure sealing
+Speaker wire,18AWG,—,—,Local,Amp to crossover runs
+Speaker wire,22AWG,—,—,Local,Crossover to tweeter
+Signal wire,Twisted pair,—,—,Local,Pot to amp input
