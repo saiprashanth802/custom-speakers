@@ -1,12 +1,16 @@
 // dsp_engine.ino
 // -----------------------------------------------------------------------------
-// Active-crossover DSP engine SKELETON for ESP32-S3 + 2x PCM5102 + 4x TPA3118.
+// Active-crossover DSP engine for ESP32-S3 + 2x PCM5102 + 4x TPA3118.
 //
-// STATUS: compiles-target, NOT yet verified on hardware. Written 2026-08-23.
+// STATUS: DSP chain, BLE control, NVS persistence, 48k/96k profile switch and
+// presets were all VERIFIED ON HARDWARE 2026-08-23 (see the memory / handoff
+// doc for the measurements). The 2026-09-15 additions — boot-profile restore,
+// post-switch status push, GET_PARAMS read-back — are COMPILED ONLY until the
+// board is next on the bench.
 //
 // What it does:
 //   * Synthesizes a two-tone test input (200 Hz + 5 kHz) as a stand-in for a
-//     real USB/WiFi source (those come later — see INTERFACE.md).
+//     real USB/WiFi source (still the open item — see INTERFACE.md).
 //   * Runs the full chain: Voicing EQ (stereo) -> LR4 crossover -> per-driver
 //     EQ / level / delay -> 4 outputs.
 //   * LOW band  -> I2S0 -> PCM5102 LOW  (L=L-woofer,  R=R-woofer).
@@ -58,6 +62,8 @@ Params params;   // live parameters (written by BLE app, restored from NVS)
 volatile uint32_t g_sampleRate  = SAMPLE_RATE;   // rate the engine is running at now
 volatile uint32_t g_pendingRate = 0;             // audio task applies this between blocks (0 = none)
 volatile bool     g_userMuted   = false;         // user mute intent (survives a profile switch)
+volatile bool     g_rateChanged = false;         // audio task -> loop(): push EVT_STATUS after a switch
+volatile bool     g_dumpParams  = false;         // BLE handler -> loop(): stream the param read-back
 SemaphoreHandle_t g_rebuildMux  = nullptr;       // serializes rebuild() across the two cores
 
 // ---- Compiled coefficient sets (rebuilt from `params`) ----------------------
@@ -101,6 +107,11 @@ Compiled Cbuf[2];
 std::atomic<Compiled*> Cactive{ &Cbuf[0] };
 
 static inline float dB2lin(float db) { return powf(10.0f, db / 20.0f); }
+// Kept below the first function on purpose: the Arduino prototype generator
+// inserts every prototype before the first function definition in the file,
+// and those prototypes reference `Compiled`, so the first function must come
+// after `struct Compiled`.
+static bool validRate(uint32_t r) { return r == 48000 || r == 96000; }
 
 static void buildInto(Compiled& C, const Params& p) {
   C = Compiled{};                 // fresh coefficients + zeroed state
@@ -218,6 +229,7 @@ void audioTask(void*) {
         incHi = 2.0f * (float)M_PI * TONE_HI_HZ / pend;
         delay(80);                          // let the DACs relock
         setAmpsMuted(g_userMuted);          // restore the user's mute intent
+        g_rateChanged = true;               // loop() (core 0) notifies the app; no BLE from this core
       }
       g_pendingRate = 0;
     }
@@ -271,7 +283,16 @@ void loadDefaultConfig(Params& p) {
 Preferences prefs;
 constexpr int NUM_PRESETS = 8;
 
-static bool loadParamsBlob(const char* key, Params& p) {
+// The blob carries sampleRate, and the coefficients MUST be designed for the rate
+// I2S is actually running at:
+//   * boot (forceRate = 0): keep the blob's rate — this is how the saved profile
+//     is restored; setup() then brings I2S up at that rate directly.
+//   * runtime LOAD_PRESET (forceRate = g_sampleRate): a preset saved at 96 k
+//     loaded while running at 48 k (or vice versa) must be re-designed for the
+//     current rate, otherwise every corner frequency lands at 2x / 0.5x. This
+//     was a latent bug before 2026-09-15: the old code forced SAMPLE_RATE (48 k)
+//     unconditionally, so a preset loaded in High-Res got 48 k coefficients.
+static bool loadParamsBlob(const char* key, Params& p, uint32_t forceRate) {
   prefs.begin("dsp", true);
   bool ok = false;
   if (prefs.isKey(key)) {
@@ -280,12 +301,18 @@ static bool loadParamsBlob(const char* key, Params& p) {
     if (n == sizeof(tmp) && tmp.version == p.version) { p = tmp; ok = true; }
   }
   prefs.end();
-  p.sampleRate = SAMPLE_RATE;   // rate switch not yet implemented; keep coeffs matched to I2S
+  if (forceRate)               p.sampleRate = forceRate;
+  else if (!validRate(p.sampleRate)) p.sampleRate = SAMPLE_RATE;   // corrupt/old blob -> safe default
   return ok;
 }
+// Persist with the *intended* rate: if a SET_PROFILE is still pending in the
+// audio task, save that, not the rate we are about to leave.
 static void saveParamsBlob(const char* key, const Params& p) {
+  Params copy = p;
+  uint32_t pend = g_pendingRate;
+  copy.sampleRate = pend ? pend : (uint32_t)g_sampleRate;
   prefs.begin("dsp", false);
-  prefs.putBytes(key, &p, sizeof(p));
+  prefs.putBytes(key, &copy, sizeof(copy));
   prefs.end();
 }
 static void presetKey(char* out, size_t n, int slot) { snprintf(out, n, "preset%d", slot); }
@@ -293,19 +320,21 @@ static void presetKey(char* out, size_t n, int slot) { snprintf(out, n, "preset%
 // =============================================================================
 // BLE GATT server — device side of the frozen protocol (see PROTOCOL.md).
 // Runs on core 0 (NimBLE host task). CMD writes mutate `params` and rebuild()
-// (double-buffered handoff to the audio core). Emits EVT_HELLO/STATUS/ACK.
-// NOT YET DONE: SET_PROFILE rate switch, and NVS persistence — both ACK-stubbed.
+// (double-buffered handoff to the audio core). Emits EVT_HELLO/STATUS/ACK, and
+// EVT_PARAM x N + EVT_PARAMS_DONE for the read-back. SET_PROFILE hands the rate
+// switch to the audio task; NVS save/load is live (see the Preferences block).
 // =============================================================================
 static NimBLECharacteristic* g_evt = nullptr;
 static Profile g_profile = PROFILE_NORMAL;
 
 static float  rdF32(const uint8_t* d, int off) { float f; memcpy(&f, d + off, 4); return f; }
 static uint16_t rdU16(const uint8_t* d, int off) { return (uint16_t)(d[off] | (d[off + 1] << 8)); }
+static void wrF32(uint8_t* d, int off, float f) { memcpy(d + off, &f, 4); }
 
-static void sendEvt(const uint8_t* data, size_t len) {
-  if (!g_evt) return;
+static bool sendEvt(const uint8_t* data, size_t len) {
+  if (!g_evt) return false;
   g_evt->setValue(data, len);
-  g_evt->notify();
+  return g_evt->notify();
 }
 static void sendAck(uint8_t op, uint8_t result) {
   uint8_t b[3] = { EVT_ACK, op, result };
@@ -327,6 +356,50 @@ static void sendStatus() {
   sendEvt(b, sizeof(b));
 }
 
+// ---- Read-back: stream every parameter as EVT_PARAM frames ------------------
+// Called from loop() (core 0 Arduino task), NOT from the GATT write callback:
+// 40 back-to-back notifies from inside the host task can overrun NimBLE's tx
+// queue. A 3 ms gap per frame keeps it well under the connection interval.
+// One retry per frame on a false notify(); a frame that still fails is counted
+// as skipped and the app's 3 s timeout falls back to a push.
+static uint32_t g_dumpCount = 0;
+static void emitParam(const uint8_t* payload, size_t len) {
+  uint8_t b[20];
+  b[0] = EVT_PARAM;
+  memcpy(b + 1, payload, len);
+  if (!sendEvt(b, len + 1)) { delay(5); if (!sendEvt(b, len + 1)) return; }
+  g_dumpCount++;
+  delay(3);
+}
+static void emitBand(uint8_t op, int drv, int idx, const EqBand& e) {
+  uint8_t p[18]; int o = 0;
+  p[o++] = op;
+  if (op == CMD_SET_DRIVER_EQ_BAND) p[o++] = (uint8_t)drv;
+  p[o++] = (uint8_t)idx; p[o++] = e.enabled ? 1 : 0; p[o++] = (uint8_t)e.type;
+  wrF32(p, o, e.f); o += 4; wrF32(p, o, e.Q); o += 4; wrF32(p, o, e.gainDb); o += 4;
+  emitParam(p, o);
+}
+static void dumpParams() {
+  g_dumpCount = 0;
+  uint8_t p[8];
+  // Profile first so the app knows the rate before it converts delay samples->ms.
+  p[0] = CMD_SET_PROFILE;     p[1] = (uint8_t)g_profile;             emitParam(p, 2);
+  p[0] = CMD_SET_MUTE;        p[1] = g_userMuted ? 1 : 0;            emitParam(p, 2);
+  p[0] = CMD_SET_MASTER_GAIN; wrF32(p, 1, params.masterGain);        emitParam(p, 5);
+  p[0] = CMD_SET_CROSSOVER_HZ;wrF32(p, 1, params.crossoverHz);       emitParam(p, 5);
+  p[0] = CMD_SET_VOICING_PREAMP; wrF32(p, 1, params.voicingPreampDb); emitParam(p, 5);
+  for (int i = 0; i < MAX_VOICING_BANDS; i++) emitBand(CMD_SET_VOICING_BAND, 0, i, params.voicing[i]);
+  for (int d = 0; d < NUM_DRIVERS; d++) {
+    p[0] = CMD_SET_DRIVER_LEVEL; p[1] = (uint8_t)d; wrF32(p, 2, params.driver[d].levelDb); emitParam(p, 6);
+    uint16_t ds = (uint16_t)params.driver[d].delaySamples;
+    p[0] = CMD_SET_DRIVER_DELAY; p[1] = (uint8_t)d; p[2] = ds & 0xFF; p[3] = ds >> 8;   emitParam(p, 4);
+    for (int i = 0; i < MAX_DRIVER_BANDS; i++) emitBand(CMD_SET_DRIVER_EQ_BAND, d, i, params.driver[d].eq[i]);
+  }
+  uint8_t done[2] = { EVT_PARAMS_DONE, (uint8_t)g_dumpCount };
+  sendEvt(done, sizeof(done));
+  Serial.printf("[ble] params dump: %lu frames\n", (unsigned long)g_dumpCount);
+}
+
 // Dispatch one CMD frame. Returns 0 on success.
 static uint8_t dispatchCmd(const uint8_t* d, size_t n) {
   if (n < 1) return 1;
@@ -334,6 +407,7 @@ static uint8_t dispatchCmd(const uint8_t* d, size_t n) {
   switch (op) {
     case CMD_HELLO:      sendHello();  return 0;
     case CMD_GET_STATUS: sendStatus(); return 0;
+    case CMD_GET_PARAMS: g_dumpParams = true; return 0;   // loop() streams it after the ACK
 
     case CMD_SET_MASTER_GAIN:  if (n < 5) return 1; params.masterGain = rdF32(d,1); rebuild(params); return 0;
     case CMD_SET_MUTE:         if (n < 2) return 1; g_userMuted = d[1] != 0; setAmpsMuted(g_userMuted); return 0;
@@ -387,7 +461,10 @@ static uint8_t dispatchCmd(const uint8_t* d, size_t n) {
     case CMD_LOAD_PRESET: {
       if (n < 2) return 1; int slot = d[1]; if (slot < 0 || slot >= NUM_PRESETS) return 2;
       char k[16]; presetKey(k, sizeof(k), slot);
-      if (!loadParamsBlob(k, params)) return 3;      // no such preset
+      // Design for the rate we are running at (or switching to), never the
+      // rate the preset happened to be saved at.
+      uint32_t pend = g_pendingRate;
+      if (!loadParamsBlob(k, params, pend ? pend : (uint32_t)g_sampleRate)) return 3;   // no such preset
       rebuild(params); sendStatus(); return 0;
     }
 
@@ -445,14 +522,21 @@ void setup() {
 
   g_rebuildMux = xSemaphoreCreateMutex();   // must exist before the first rebuild()
   loadDefaultConfig(params);
-  if (loadParamsBlob("params", params))     // restore saved boot default if present
-    Serial.println("[dsp_engine] restored params from NVS");
+  if (loadParamsBlob("params", params, 0))  // restore saved boot default, INCLUDING its rate
+    Serial.printf("[dsp_engine] restored params from NVS (saved rate %lu Hz)\n",
+                  (unsigned long)params.sampleRate);
+  // Boot straight into the saved profile: no mute/switch cycle, I2S comes up at
+  // that rate. g_sampleRate must be final before audioTask starts (it derives
+  // the tone increments from it once).
+  g_sampleRate = params.sampleRate;
+  g_profile    = (g_sampleRate == 96000) ? PROFILE_HIRES : PROFILE_NORMAL;
   rebuild(params);
 
+  const uint32_t bootRate = g_sampleRate;
   i2sLow.setPins (I2S0_BCLK, I2S0_LRCK, I2S0_DOUT, -1, -1);
   i2sHigh.setPins(I2S1_BCLK, I2S1_LRCK, I2S1_DOUT, -1, -1);
-  bool ok = i2sLow.begin (I2S_MODE_STD, SAMPLE_RATE, I2S_DATA_BIT_WIDTH_16BIT, I2S_SLOT_MODE_STEREO)
-         && i2sHigh.begin(I2S_MODE_STD, SAMPLE_RATE, I2S_DATA_BIT_WIDTH_16BIT, I2S_SLOT_MODE_STEREO);
+  bool ok = i2sLow.begin (I2S_MODE_STD, bootRate, I2S_DATA_BIT_WIDTH_16BIT, I2S_SLOT_MODE_STEREO)
+         && i2sHigh.begin(I2S_MODE_STD, bootRate, I2S_DATA_BIT_WIDTH_16BIT, I2S_SLOT_MODE_STEREO);
   if (!ok) {
     Serial.println("[dsp_engine] I2S begin FAILED (core >=3.0? two I2S ports?)");
     while (true) delay(1000);         // stay muted
@@ -465,13 +549,17 @@ void setup() {
   setAmpsMuted(false);
 
   setupBle();                         // advertise the DSP control service
-  Serial.printf("[dsp_engine] running @ %lu Hz, un-muted, BLE 'SpeakerDSP' advertising\n",
-                (unsigned long)SAMPLE_RATE);
+  Serial.printf("[dsp_engine] running @ %lu Hz (%s), un-muted, BLE 'SpeakerDSP' advertising\n",
+                (unsigned long)bootRate, g_profile == PROFILE_HIRES ? "High-Res" : "Normal");
 }
 
 void loop() {
+  // BLE work handed off by the other contexts (audio core / GATT callback):
+  if (g_rateChanged) { g_rateChanged = false; sendStatus(); }   // rate now final -> app refreshes
+  if (g_dumpParams)  { g_dumpParams  = false; dumpParams();  }
+
   static uint32_t last = 0;
-  if (millis() - last < 1000) { delay(50); return; }
+  if (millis() - last < 1000) { delay(20); return; }
   last = millis();
 
   float cps = g_cyclesPerSample;
