@@ -1,7 +1,12 @@
 # Interface & control architecture
 
-**Status:** design, nothing built. Started 2026-08-23. Companion app not yet
-scaffolded; firmware control layer not written.
+**Status (2026-09-15):** built. The BLE control layer, the companion app
+(`companion/SpeakerDspDeck`, "Void Deck" UI with a live response curve) and the
+full editor below were **verified on hardware 2026-08-23**; the read-back /
+boot-profile additions of 2026-09-15 are compiled only (see PROTOCOL.md). What
+is still design-only is the **audio source** — the profile table below still
+describes the intended USB/WiFi inputs, and the firmware runs a two-tone test
+generator in their place.
 
 ## Scope decisions (2026-08-23)
 
