@@ -15,6 +15,7 @@ public enum CmdOp : byte
 {
     Hello             = 0x01,
     GetStatus         = 0x02,
+    GetParams         = 0x03,   // device streams Param x N then ParamsDone (fw >= 2)
     SetMasterGain     = 0x10,
     SetMute           = 0x11,
     SetProfile        = 0x12,
@@ -35,4 +36,8 @@ public enum EvtOp : byte
     Hello  = 0x81,
     Status = 0x82,
     Ack    = 0x83,
+    // Read-back: [0x84][setOpcode][that SET's payload] — decoded with the same
+    // field offsets the app uses to encode it. Then [0x85][u8 count].
+    Param      = 0x84,
+    ParamsDone = 0x85,
 }

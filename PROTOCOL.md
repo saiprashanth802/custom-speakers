@@ -67,3 +67,37 @@ are built).
 On connect the app sends HELLO and checks `protocolVersion == PROTOCOL_VERSION`.
 Mismatch → app shows "firmware/app protocol mismatch, update one side" and stays
 read-only. Never silently write against a different version.
+
+## v1 + additive read-back (2026-09-15) — COMPILED ONLY, not yet exercised on hardware
+
+`PROTOCOL_VERSION` stays **1**: nothing above changed. `FW_VERSION` → 2. An old app
+never sends the new opcode; an old firmware answers it with `EVT_ACK result 0xFF`,
+which the new app treats as "no read-back, push instead" — so every pairing of old
+and new still works.
+
+| Op | Name | Payload |
+|----|------|---------|
+| `0x03` | GET_PARAMS | — (device ACKs, then streams the events below from its main loop) |
+
+| Ev | Name | Payload |
+|----|------|---------|
+| `0x84` | EVT_PARAM | `u8 setOpcode` followed by **that SET opcode's exact CMD payload** |
+| `0x85` | EVT_PARAMS_DONE | `u8 count` — number of EVT_PARAM frames the device sent |
+
+Reusing the SET layouts means the app decodes each EVT_PARAM with the same offsets it
+encodes with. Largest frame is `0x84 0x32 …` = 18 bytes, inside the 20-byte notify
+limit at the default 23-byte MTU. Emission order (39 frames): `0x12` profile, `0x11`
+mute, `0x10` master, `0x13` crossover, `0x14` preamp, `0x20` ×10 voicing bands, then
+per driver `0x30` level, `0x31` delay (samples), `0x32` ×4 EQ bands. Profile goes first
+so the app knows the rate before it converts delay samples to ms. 3 ms gap per frame.
+
+**Connect sequence is now:** subscribe → app sends HELLO → EVT_HELLO → app sends
+GET_PARAMS → 39× EVT_PARAM → EVT_PARAMS_DONE. The app applies these silently (no echo)
+and only starts sending SETs on user edits. `PushAll` survives as the fallback for the
+NAK / 3 s-timeout case.
+
+**Also new in fw 2 (no protocol change):** a second EVT_STATUS is pushed after the
+audio task finishes a profile switch, so `sampleRate` in it is the rate actually
+running; the immediate reply to SET_PROFILE still reports the old rate. And the saved
+`sampleRate` in the NVS blob is now honoured at boot (boot-profile restore) and
+LOAD_PRESET re-designs for the running rate instead of the saved one.

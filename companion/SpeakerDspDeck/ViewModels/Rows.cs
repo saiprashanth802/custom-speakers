@@ -105,11 +105,13 @@ public sealed class DriverRow : Bindable
     public string Name => Caps.DriverNames[_idx];
     public ObservableCollection<DriverBandRow> Eq { get; } = new();
 
+    private bool _suppress;
+
     private double _levelDb;
     public double LevelDb
     {
         get => _levelDb;
-        set { if (Set(ref _levelDb, value)) _ = _send(BuildLevelFrame()); }
+        set { if (Set(ref _levelDb, value) && !_suppress) _ = _send(BuildLevelFrame()); }
     }
 
     // Time alignment. Shown in ms; sent as sample count for the current rate.
@@ -117,8 +119,13 @@ public sealed class DriverRow : Bindable
     public double DelayMs
     {
         get => _delayMs;
-        set { if (Set(ref _delayMs, value)) _ = _send(BuildDelayFrame()); }
+        set { if (Set(ref _delayMs, value) && !_suppress) _ = _send(BuildDelayFrame()); }
     }
+
+    // Read-back from the device: update the UI without echoing a SET.
+    public void LoadLevelSilently(double dB) { _suppress = true; LevelDb = dB; _suppress = false; }
+    public void LoadDelaySilently(int samples, int rateHz)
+    { _suppress = true; DelayMs = samples * 1000.0 / rateHz; _suppress = false; }
 
     public Frame BuildLevelFrame() =>
         Frame.Cmd(CmdOp.SetDriverLevel).U8(_idx).F32((float)_levelDb);

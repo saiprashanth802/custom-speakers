@@ -46,5 +46,10 @@ public readonly struct EvtReader
     public byte U8(int off) => _data[1 + off];
     public ushort U16(int off) => BinaryPrimitives.ReadUInt16LittleEndian(_data.AsSpan(1 + off, 2));
     public uint U32(int off) => BinaryPrimitives.ReadUInt32LittleEndian(_data.AsSpan(1 + off, 4));
+    public float F32(int off) => BinaryPrimitives.ReadSingleLittleEndian(_data.AsSpan(1 + off, 4));
     public int Length => _data.Length;
+
+    // For EVT_PARAM: a reader positioned on the inner SET frame, so payload
+    // offsets match the CMD layout in PROTOCOL.md exactly.
+    public EvtReader Inner() => new(_data.AsSpan(1).ToArray());
 }

@@ -38,6 +38,8 @@
             <TextBlock>
               <Run Text="High-Res mode"/>
               <Run Text=" — WiFi 24/96  (off = Normal, USB 24/48)" Foreground="{StaticResource Muted}" FontSize="11"/>
+              <Run Text="   device: " Foreground="{StaticResource Muted}" FontSize="11"/>
+              <Run Text="{Binding DeviceRateText, Mode=OneWay}" FontSize="11"/>
             </TextBlock>
           </CheckBox>
 
