@@ -1,0 +1,13 @@
+# .NET / WPF
+companion/**/bin/
+companion/**/obj/
+.vs/
+*.user
+*.suo
+# Arduino / ESP-IDF
+firmware/**/build/
+*.bin
+*.elf
+# OS
+Thumbs.db
+.DS_Store
