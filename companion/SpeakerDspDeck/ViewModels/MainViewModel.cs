@@ -57,8 +57,40 @@ public sealed class MainViewModel : Bindable
             PushAll();
         };
 
+        // Response curve: recompute on any voicing/crossover/preamp/rate change.
+        foreach (var b in Voicing) b.PropertyChanged += (_, _) => RecomputeResponse();
+        PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is nameof(CrossoverHz) or nameof(VoicingPreampDb) or nameof(IsHiRes))
+                RecomputeResponse();
+        };
+        RecomputeResponse();
+
         _ble.StartScan();   // auto-connect on launch
     }
+
+    // ---- Response curve (what the ResponseCurve control draws) -------------
+    private static readonly double[] Axis = Response.LogAxis(180);
+    private ResponseData? _response;
+    public ResponseData? ResponseCurve { get => _response; private set => Set(ref _response, value); }
+
+    private void RecomputeResponse()
+    {
+        double fs = IsHiRes ? 96000 : 48000;
+        var chain = Voicing.Where(b => b.Enabled)
+                           .Select(b => Response.Design(b.Type, fs, b.F, b.Q, b.GainDb)).ToList();
+        ResponseCurve = new ResponseData(
+            Axis,
+            Response.ChainDb(chain, fs, Axis, VoicingPreampDb),
+            Response.Lr4Db(FilterType.LowPass, fs, CrossoverHz, Axis),
+            Response.Lr4Db(FilterType.HighPass, fs, CrossoverHz, Axis),
+            CrossoverHz);
+    }
+
+    // Footer log strip: collapsed by default, expands on click.
+    private bool _logExpanded;
+    public bool LogExpanded { get => _logExpanded; set => Set(ref _logExpanded, value); }
+    public string LatestLog => LogLines.Count > 0 ? LogLines[0] : "";
 
     // ---- Presets: capture the whole UI state / apply it back --------------
     private PresetSnapshot CaptureSnapshot() => new()
@@ -379,6 +411,7 @@ public sealed class MainViewModel : Bindable
     {
         LogLines.Insert(0, $"{DateTime.Now:HH:mm:ss}  {s}");
         while (LogLines.Count > 200) LogLines.RemoveAt(LogLines.Count - 1);
+        Raise(nameof(LatestLog));
     });
 
     private void RaiseCommands()
