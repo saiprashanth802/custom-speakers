@@ -68,7 +68,7 @@ On connect the app sends HELLO and checks `protocolVersion == PROTOCOL_VERSION`.
 Mismatch → app shows "firmware/app protocol mismatch, update one side" and stays
 read-only. Never silently write against a different version.
 
-## v1 + additive read-back (2026-09-15) — COMPILED ONLY, not yet exercised on hardware
+## v1 + additive read-back (2026-09-15) — VERIFIED ON HARDWARE 2026-09-15 (39/39 params, second STATUS at 96000)
 
 `PROTOCOL_VERSION` stays **1**: nothing above changed. `FW_VERSION` → 2. An old app
 never sends the new opcode; an old firmware answers it with `EVT_ACK result 0xFF`,
@@ -101,3 +101,17 @@ audio task finishes a profile switch, so `sampleRate` in it is the rate actually
 running; the immediate reply to SET_PROFILE still reports the old rate. And the saved
 `sampleRate` in the NVS blob is now honoured at boot (boot-profile restore) and
 LOAD_PRESET re-designs for the running rate instead of the saved one.
+
+## fw 3 (2026-09-15) — USB audio source, COMPILED ONLY
+
+`PROTOCOL_VERSION` still **1**, `FW_VERSION` → 3. The PC's USB stream is the input
+and **the USB host owns the sample rate while it streams**: Windows' SET_CUR
+sampling-frequency (48000 or 96000) drives the same switch SET_PROFILE did, and the
+second EVT_STATUS above reports the result. Consequences for the app:
+
+- `SET_PROFILE` while a stream is active → `EVT_STATUS` (unchanged state) followed by
+  `EVT_ACK result 3` ("rate owned by USB host"). With nothing streaming it works as
+  before, so 96 k profiling on a bare bench is still possible.
+- A profile change can now arrive **unsolicited** (the host opened a stream at the
+  other rate): it shows up as an EVT_STATUS with the new `sampleRate`, exactly like
+  the post-switch push. The app already applies STATUS silently.

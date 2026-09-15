@@ -352,6 +352,10 @@ public sealed class MainViewModel : Bindable
                         AddLog("Firmware has no read-back — pushing app state instead.");
                         PushAll();
                     }
+                    else if ((CmdOp)r.U8(0) == CmdOp.SetProfile && r.U8(1) == 3)
+                        // FW 3+: the USB host owns the rate while it streams. The
+                        // STATUS that precedes this ACK has already put the toggle back.
+                        AddLog("Rate is set by the USB host while it streams — change it in Windows sound settings.");
                     else AddLog($"Device NAK on op 0x{r.U8(0):X2} (err {r.U8(1)}).");
                 }
                 break;
