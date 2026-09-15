@@ -5,9 +5,11 @@
 // STATUS: DSP chain, BLE control, NVS persistence, 48k/96k profile switch,
 // presets, boot-profile restore and GET_PARAMS read-back were all VERIFIED ON
 // HARDWARE (2026-08-23, 2026-09-15). The USB audio source merged in on
-// 2026-09-15 is COMPILED ONLY in this build until the board is back on the
-// bench; the USB path itself was verified standalone the same day in
-// firmware/uac_test (24/48 and 24/96, see WIRING.md).
+// 2026-09-15 was VERIFIED ON HARDWARE the same afternoon: 24/48 and 24/96
+// streamed through the full chain with the app connected over BLE, the rate
+// followed the host, and 44 biquads @ 96 k measured 75.3-75.9 % with USB
+// live (74.9 % without). The four-GPIO amp mute is compiled only until the
+// NPNs are wired.
 //
 // What it does:
 //   * Presents itself to the PC as a USB Audio Class 1.0 stereo speaker

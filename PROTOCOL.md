@@ -102,7 +102,7 @@ running; the immediate reply to SET_PROFILE still reports the old rate. And the 
 `sampleRate` in the NVS blob is now honoured at boot (boot-profile restore) and
 LOAD_PRESET re-designs for the running rate instead of the saved one.
 
-## fw 3 (2026-09-15) — USB audio source, COMPILED ONLY
+## fw 3 (2026-09-15) — USB audio source, VERIFIED ON HARDWARE 2026-09-15 (rate followed the host 48 k → 96 k, ACK 3 path exercised from the app)
 
 `PROTOCOL_VERSION` still **1**, `FW_VERSION` → 3. The PC's USB stream is the input
 and **the USB host owns the sample rate while it streams**: Windows' SET_CUR

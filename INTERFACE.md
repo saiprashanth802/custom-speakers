@@ -3,10 +3,10 @@
 **Status (2026-09-15):** built. The BLE control layer, the companion app
 (`companion/SpeakerDspDeck`, "Void Deck" UI with a live response curve) and the
 full editor below were **verified on hardware 2026-08-23**; the read-back /
-boot-profile additions of 2026-09-15 are compiled only (see PROTOCOL.md). What
-is still design-only is the **audio source** — the profile table below still
-describes the intended USB/WiFi inputs, and the firmware runs a two-tone test
-generator in their place.
+boot-profile additions of 2026-09-15 were verified on hardware the same day (see PROTOCOL.md). The
+**audio source is USB-C (UAC 1.0), verified on hardware 2026-09-15** at 24/48 and
+24/96 through the full chain with the app connected; the two-tone generator is
+now an opt-in bench mode (`IDLE_TEST_TONES`).
 
 ## Scope decisions (2026-08-23)
 
