@@ -129,7 +129,7 @@ a missed DMA deadline = an audible click). Ceilings per path:
 | Source | Realistic max | Why |
 |--------|---------------|-----|
 | **WiFi** (streamed) | 24-bit / 96 kHz+ | Not codec-capped — buffer the stream, clock it locally |
-| **USB-C** (UAC) | 24-bit / 48 kHz | Native USB is Full-Speed (12 Mbit/s); 48 k is the comfortable ceiling |
+| **USB-C** (UAC) | **24-bit / 96 kHz — measured 2026-09-15** | Full-Speed ISO carries 582 B/ms of the 1023 allowed. The real limit was the S3's 1 KB USB FIFO + TinyUSB's 2x RX rule (fails 24/96 silently); 1x packet works, see `firmware/uac_test` |
 | **A2DP** (Bluetooth) | 44.1 kHz / 16-bit, lossy | ESP32 A2DP sink is **SBC only** |
 
 **WiFi is the high-res path**, but the *protocol* still caps you: AirPlay and
@@ -139,7 +139,7 @@ FLAC decode + 4-channel crossover on one chip is tight. The usual fix is to
 stream **already-decoded PCM** (Snapcast-style): trades bandwidth (cheap on
 WiFi) for CPU (precious). Running WiFi at 48 kHz also frees crossover headroom.
 
-**USB-C at 24/48** is the simplest solid path — synchronous, clean, from a PC.
+**USB-C is the path, at both rates** — asynchronous with a feedback endpoint, clean, from a PC. Verified on the bench 2026-09-15 at 24/48, 16/88.2 and 24/96 (the last needs the RX-FIFO workaround in `firmware/uac_test`). The WiFi row above is kept for the record; nothing needs it any more.
 
 ### Why Bluetooth is stuck at 16-bit (SBC vs aptX vs LDAC)
 

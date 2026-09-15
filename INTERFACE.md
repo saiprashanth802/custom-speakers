@@ -33,7 +33,7 @@ practical phone-music path on the S3 yet (immature stack, spotty phone support).
 Consequences:
 - BLE **companion app / control** → fine, that's what the S3 does.
 - **Phone-over-Bluetooth music → not available** with this chip. Accepted.
-- Real audio inputs are **USB-C (UAC, ≤24/48)** and **WiFi (≤24/96+)**.
+- Real audio input is **USB-C (UAC)**, and it covers **both profiles: 24/48 and 24/96 verified on the bench 2026-09-15** (`firmware/uac_test`). WiFi was planned as the only 96 k-capable source; that premise is gone, and campus WPA2-Enterprise ruled WiFi out anyway.
 
 (If phone-BT music ever becomes a hard requirement it's a chip-level fork:
 original ESP32 with Classic BT, or a dedicated A2DP receiver module feeding an
@@ -41,8 +41,10 @@ input. Both were considered and declined for compactness on 2026-08-23.)
 
 ## The "High-Res / Normal" toggle = bundled Audio Profile
 
-Rate and source are coupled by hardware (WiFi is the only 24/96-capable source;
-USB caps at 24/48), so the toggle switches a **profile**, not just a rate:
+The toggle was designed when USB was thought to cap at 24/48 and WiFi was the only
+96 k source. **Corrected 2026-09-15: USB does both rates**, so the source column of
+this table collapses to USB-C and the toggle is a sample-rate/DSP-budget choice. The
+table is kept as the original design record:
 
 | | High-Res | Normal |
 |---|----------|--------|
