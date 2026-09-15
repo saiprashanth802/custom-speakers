@@ -142,7 +142,7 @@
                 <CheckBox IsChecked="{Binding IsHiRes}" VerticalAlignment="Center">
                   <TextBlock>
                     <Run Text="High-Res"/>
-                    <Run Text="  WiFi · 24/96" Foreground="{StaticResource Dim}" FontSize="11"/>
+                    <Run Text="  USB · 24/96, follows the host while it streams" Foreground="{StaticResource Dim}" FontSize="11"/>
                   </TextBlock>
                 </CheckBox>
                 <CheckBox Grid.Column="1" Content="Mute" Style="{StaticResource DangerToggle}" IsChecked="{Binding Muted}" VerticalAlignment="Center"/>
