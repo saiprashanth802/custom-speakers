@@ -40,6 +40,14 @@ High-Res/Normal profile that sets the sample rate this engine runs at.
 
 ## EQ import (Peace / AutoEQ / Equalizer APO)
 
+**Also graphic-EQ curves (2026-09-15):** an Audacity / REW `FilterCurve:` export (a list of
+(Hz, dB) points, what a speaker measurement produces) is fitted to the ten bands by
+`Eq/FilterCurveFitter.cs` — greedy placement on the largest residual (PK at five Qs, or a
+shelf at either end), then coordinate descent on every band's F/Q/gain against the
+app's own RBJ response, weighted 30 Hz–18 kHz. The import log states the residual
+(RMS / worst point). Measured on the 50-point speaker curve: RMS 0.08 dB, worst 0.3 dB,
+72 ms. Preamp = −(curve maximum) so the loudest point sits at 0 dBFS.
+
 Config files are plain text:
 
 ```

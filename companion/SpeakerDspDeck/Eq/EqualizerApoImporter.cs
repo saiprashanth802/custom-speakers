@@ -27,6 +27,26 @@ public static class EqualizerApoImporter
         var warnings = new List<string>();
         var ci = CultureInfo.InvariantCulture;
 
+        // A graphic-EQ curve (Audacity / REW "FilterCurve" export) is not parametric:
+        // fit it to the ten bands instead of importing nothing (2026-09-15: the user's
+        // speaker measurement came in this form and produced "0 band(s)").
+        if (FilterCurveFitter.IsFilterCurve(text))
+        {
+            var curve = FilterCurveFitter.ParseCurve(text);
+            if (curve is null)
+            {
+                warnings.Add("FilterCurve has fewer than four points.");
+                return new Result(0f, bands, warnings);
+            }
+            var fit = FilterCurveFitter.FitBands(curve.Value.f, curve.Value.v, Caps.MaxVoicingBands);
+            // Keep the loudest point of the fitted curve at or below 0 dBFS.
+            double peak = curve.Value.v.Zip(curve.Value.f).Where(p => p.Second >= 30).Max(p => p.First);
+            preamp = (float)Math.Round(Math.Min(0, -peak), 1);
+            warnings.Add($"Fitted {curve.Value.f.Length}-point curve with {fit.Bands.Count} band(s): " +
+                         $"RMS {fit.RmsDb:0.00} dB, worst {fit.MaxAbsDb:0.0} dB at {fit.MaxAtHz:0} Hz (30 Hz–18 kHz).");
+            return new Result(preamp, fit.Bands, warnings);
+        }
+
         foreach (var raw in text.Split('\n'))
         {
             var line = raw.Trim();
