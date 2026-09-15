@@ -11,3 +11,4 @@ firmware/**/build/
 # OS
 Thumbs.db
 .DS_Store
+firmware/uac_test/build-*/
