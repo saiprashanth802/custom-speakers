@@ -166,7 +166,13 @@
                 <TextBlock Text="Frequency" Foreground="{StaticResource Muted}" FontSize="11"/>
                 <TextBlock Text="{Binding CrossoverHz, StringFormat='{}{0:0} Hz'}" Style="{StaticResource Mono}" HorizontalAlignment="Right"/>
               </Grid>
-              <Slider Minimum="500" Maximum="6000" Value="{Binding CrossoverHz}"/>
+              <Slider Minimum="500" Maximum="6000" Value="{Binding CrossoverHz}" IsEnabled="{Binding CrossoverSliderEnabled}"/>
+              <CheckBox IsChecked="{Binding FullRangeCheck}" Margin="0,8,0,0">
+                <TextBlock>
+                  <Run Text="Full-range check"/>
+                  <Run Text="  LOW DAC carries everything · IEMs on its jack, amps off" Foreground="{StaticResource Dim}" FontSize="11"/>
+                </TextBlock>
+              </CheckBox>
               <Grid Margin="0,12,0,4">
                 <TextBlock Text="Voicing preamp" Foreground="{StaticResource Muted}" FontSize="11"/>
                 <TextBlock Text="{Binding VoicingPreampDb, StringFormat='{}{0:+0.0;-0.0;0.0} dB'}" Style="{StaticResource Mono}" HorizontalAlignment="Right"/>

@@ -61,7 +61,7 @@ public sealed class MainViewModel : Bindable
         foreach (var b in Voicing) b.PropertyChanged += (_, _) => RecomputeResponse();
         PropertyChanged += (_, e) =>
         {
-            if (e.PropertyName is nameof(CrossoverHz) or nameof(VoicingPreampDb) or nameof(IsHiRes))
+            if (e.PropertyName is nameof(CrossoverHz) or nameof(VoicingPreampDb) or nameof(IsHiRes) or nameof(FullRangeCheck))
                 RecomputeResponse();
         };
         RecomputeResponse();
@@ -77,14 +77,15 @@ public sealed class MainViewModel : Bindable
     private void RecomputeResponse()
     {
         double fs = IsHiRes ? 96000 : 48000;
+        double xo = FullRangeCheck ? FullRangeHz : CrossoverHz;
         var chain = Voicing.Where(b => b.Enabled)
                            .Select(b => Response.Design(b.Type, fs, b.F, b.Q, b.GainDb)).ToList();
         ResponseCurve = new ResponseData(
             Axis,
             Response.ChainDb(chain, fs, Axis, VoicingPreampDb),
-            Response.Lr4Db(FilterType.LowPass, fs, CrossoverHz, Axis),
-            Response.Lr4Db(FilterType.HighPass, fs, CrossoverHz, Axis),
-            CrossoverHz);
+            Response.Lr4Db(FilterType.LowPass, fs, xo, Axis),
+            Response.Lr4Db(FilterType.HighPass, fs, xo, Axis),
+            xo);
     }
 
     // Footer log strip: collapsed by default, expands on click.
@@ -107,6 +108,7 @@ public sealed class MainViewModel : Bindable
 
     private async void ApplySnapshot(PresetSnapshot s)
     {
+        FullRangeCheck = false;             // a preset is a real tuning, not a headphone check
         // Setting these properties sends the corresponding commands to the device.
         IsHiRes = s.IsHiRes;
         Muted = s.Muted;
@@ -217,8 +219,31 @@ public sealed class MainViewModel : Bindable
     public double CrossoverHz
     {
         get => _crossoverHz;
-        set { if (Set(ref _crossoverHz, value) && !_silent) _ = _ble.Send(Frame.Cmd(CmdOp.SetCrossoverHz).F32((float)value)); }
+        set { if (Set(ref _crossoverHz, value) && !_silent && !FullRangeCheck) _ = _ble.Send(Frame.Cmd(CmdOp.SetCrossoverHz).F32((float)value)); }
     }
+
+    // Headphone / full-range check: park the crossover at 20 kHz so the LOW DAC carries
+    // the whole band (LR4 at 20 k is -0.7 dB at 16 k, flat below) and the HIGH DAC
+    // goes silent. Plug IEMs into the LOW DAC's jack, amps off. The slider keeps the
+    // real crossover and is re-sent when the check is switched off; a device read-back
+    // of >= 19 kHz lands here instead of on the slider (whose 6 kHz maximum would
+    // coerce and echo a bogus value back).
+    private bool _fullRangeCheck;
+    public bool FullRangeCheck
+    {
+        get => _fullRangeCheck;
+        set
+        {
+            if (!Set(ref _fullRangeCheck, value)) return;
+            Raise(nameof(CrossoverSliderEnabled));
+            if (_silent) return;
+            _ = _ble.Send(Frame.Cmd(CmdOp.SetCrossoverHz).F32(value ? FullRangeHz : (float)CrossoverHz));
+            AddLog(value ? "Full-range check ON: LOW DAC carries everything, HIGH DAC silent."
+                         : $"Full-range check off: crossover back at {CrossoverHz:0} Hz.");
+        }
+    }
+    public const float FullRangeHz = 20000f;
+    public bool CrossoverSliderEnabled => !_fullRangeCheck;
 
     private double _preampDb;
     public double VoicingPreampDb
@@ -265,7 +290,7 @@ public sealed class MainViewModel : Bindable
     {
         await _ble.Send(Frame.Cmd(CmdOp.SetMasterGain).F32((float)(MasterPct / 100.0)));
         await _ble.Send(Frame.Cmd(CmdOp.SetMute).Bool(Muted));
-        await _ble.Send(Frame.Cmd(CmdOp.SetCrossoverHz).F32((float)CrossoverHz));
+        await _ble.Send(Frame.Cmd(CmdOp.SetCrossoverHz).F32(FullRangeCheck ? FullRangeHz : (float)CrossoverHz));
         await _ble.Send(Frame.Cmd(CmdOp.SetVoicingPreamp).F32((float)VoicingPreampDb));
         foreach (var b in Voicing) await _ble.Send(b.BuildFrame());
         foreach (var d in Drivers)
@@ -374,7 +399,10 @@ public sealed class MainViewModel : Bindable
                 case CmdOp.SetProfile:       SelectedProfile = (Profile)p.U8(0); break;
                 case CmdOp.SetMute:          Muted = p.U8(0) != 0; break;
                 case CmdOp.SetMasterGain:    MasterPct = Math.Round(p.F32(0) * 100.0, 1); break;
-                case CmdOp.SetCrossoverHz:   CrossoverHz = p.F32(0); break;
+                case CmdOp.SetCrossoverHz:
+                    if (p.F32(0) >= 19000f) FullRangeCheck = true;
+                    else { FullRangeCheck = false; CrossoverHz = p.F32(0); }
+                    break;
                 case CmdOp.SetVoicingPreamp: VoicingPreampDb = p.F32(0); break;
                 case CmdOp.SetVoicingBand:
                 {
