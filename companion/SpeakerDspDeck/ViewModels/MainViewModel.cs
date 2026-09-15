@@ -336,6 +336,10 @@ public sealed class MainViewModel : Bindable
                 AddLog($"Loaded device state ({_readbackCount} of {r.U8(0)} params).");
                 if (_readbackCount != r.U8(0))
                     AddLog("WARNING: some read-back frames were lost; UI may not match the device.");
+                // The device's connect-time STATUS is lost to the same CCCD race as
+                // HELLO (verified on hardware 2026-09-15: title bar stayed "device —"),
+                // so pull it now that the subscription is live.
+                _ = _ble.Send(Frame.Cmd(CmdOp.GetStatus));
                 break;
 
             case EvtOp.Ack:

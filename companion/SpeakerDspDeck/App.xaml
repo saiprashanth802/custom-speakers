@@ -33,6 +33,13 @@
         <GradientStop Color="{StaticResource EmberColor}" Offset="0"/>
         <GradientStop Color="{StaticResource EmberDeepColor}" Offset="1"/>
       </LinearGradientBrush>
+      <!-- Soft ember halo for thumbs / the status dot. Alpha ramps to 0 at the rim
+           so it reads as glow on the void without any Effect surface. -->
+      <RadialGradientBrush x:Key="EmberHalo">
+        <GradientStop Color="#A0FFB24D" Offset="0"/>
+        <GradientStop Color="#40FF9A30" Offset="0.45"/>
+        <GradientStop Color="#00FF7A18" Offset="1"/>
+      </RadialGradientBrush>
       <!-- Old keys kept as aliases so nothing else has to change. -->
       <SolidColorBrush x:Key="Page"   Color="{StaticResource VoidColor}"/>
       <SolidColorBrush x:Key="Card"   Color="{StaticResource SurfaceColor}"/>
@@ -130,11 +137,7 @@
               </Border>
               <ControlTemplate.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                  <Setter TargetName="bd" Property="Effect">
-                    <Setter.Value>
-                      <DropShadowEffect Color="{StaticResource EmberColor}" BlurRadius="18" ShadowDepth="0" Opacity="0.55"/>
-                    </Setter.Value>
-                  </Setter>
+                  <Setter TargetName="bd" Property="Background" Value="{StaticResource EmberFlat}"/>
                 </Trigger>
                 <Trigger Property="IsEnabled" Value="False">
                   <Setter TargetName="bd" Property="Background" Value="{StaticResource Hair}"/>
@@ -188,11 +191,12 @@
                     <Thumb Width="14" Height="14" Focusable="False">
                       <Thumb.Template>
                         <ControlTemplate TargetType="Thumb">
-                          <Ellipse Fill="{StaticResource Ember}" Width="14" Height="14">
-                            <Ellipse.Effect>
-                              <DropShadowEffect Color="{StaticResource EmberColor}" BlurRadius="12" ShadowDepth="0" Opacity="0.75"/>
-                            </Ellipse.Effect>
-                          </Ellipse>
+                          <!-- Halo is a static radial gradient: cheaper than a DropShadowEffect and
+                               identical on screen. -->
+                          <Grid Width="14" Height="14">
+                            <Ellipse Width="30" Height="30" Margin="-8" Fill="{StaticResource EmberHalo}" IsHitTestVisible="False"/>
+                            <Ellipse Fill="{StaticResource Ember}" Width="14" Height="14"/>
+                          </Grid>
                         </ControlTemplate>
                       </Thumb.Template>
                     </Thumb>

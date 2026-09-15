@@ -465,7 +465,10 @@ static uint8_t dispatchCmd(const uint8_t* d, size_t n) {
       // rate the preset happened to be saved at.
       uint32_t pend = g_pendingRate;
       if (!loadParamsBlob(k, params, pend ? pend : (uint32_t)g_sampleRate)) return 3;   // no such preset
-      rebuild(params); sendStatus(); return 0;
+      rebuild(params); sendStatus();
+      Serial.printf("[nvs] %s loaded, coefficients designed for %lu Hz (running %lu)\n",
+                    k, (unsigned long)params.sampleRate, (unsigned long)g_sampleRate);
+      return 0;
     }
 
     default: return 0xFF;

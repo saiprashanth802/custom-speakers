@@ -11,17 +11,18 @@ namespace SpeakerDspDeck.Controls;
 // Pure OnRender — no per-point elements, so it redraws on every slider tick
 // without allocation pressure.
 //
-// RENDERING GOTCHA (measured 2026-09-15, screenshots in the handoff): a thin
-// (~1 px) anti-aliased curve drawn inside a PushOpacity layer gets a bright
-// white "sparkle" pixel at scattered points along it — the opacity layer's
-// intermediate surface mishandles partial-coverage pixels. It is NOT a join or
-// overlap artefact: stroked polylines (any join), per-segment DrawLine, and a
-// single filled ribbon all sparkle identically inside PushOpacity, and the
-// same ribbon is clean outside it. So translucent *thin* lines are drawn with
-// a colour pre-blended against the void at full opacity. PushOpacity is kept
-// only for the wide glow ribbons, where no sparkle is visible.
-// Curves are filled ribbons (polyline offset ± half-width along the normal)
-// rather than pens so the glow passes stay perfectly concentric.
+// Curves are filled ribbons (the polyline offset ± half-width along the
+// per-vertex normal) rather than pens, so the glow passes stay perfectly
+// concentric with the crisp line. Thin translucent lines are pre-blended
+// against the void rather than drawn through PushOpacity.
+//
+// SCREENSHOT GOTCHA (2026-09-15): Graphics.CopyFromScreen of this window shows
+// white "sparkle" pixels on every low-alpha anti-aliased edge (thin translucent
+// curves, effect rims, gradient-halo rims) and desaturates the ember. It is a
+// capture artefact — PrintWindow(PW_RENDERFULLCONTENT) of the same frame is
+// clean, hardware and software rendering both show it under CopyFromScreen,
+// and it does not depend on geometry type. Almost certainly the desktop's HDR
+// composition being read back through GDI. Verify visuals with PrintWindow.
 public sealed class ResponseCurve : FrameworkElement
 {
     public static readonly DependencyProperty DataProperty = DependencyProperty.Register(

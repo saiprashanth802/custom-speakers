@@ -63,10 +63,9 @@
 
       <StackPanel Orientation="Horizontal" Margin="18,0,0,0" VerticalAlignment="Center">
         <!-- The one warm light: breathes while searching, holds steady once linked. -->
-        <Ellipse Width="8" Height="8" Margin="0,0,10,0" VerticalAlignment="Center" Fill="{StaticResource Ember}">
-          <Ellipse.Effect>
-            <DropShadowEffect Color="{StaticResource EmberColor}" BlurRadius="10" ShadowDepth="0" Opacity="0.9"/>
-          </Ellipse.Effect>
+        <Grid Width="8" Height="8" Margin="0,0,10,0" VerticalAlignment="Center">
+          <Ellipse Width="22" Height="22" Margin="-7" Fill="{StaticResource EmberHalo}"/>
+        <Ellipse Width="8" Height="8" Fill="{StaticResource Ember}">
           <Ellipse.Style>
             <Style TargetType="Ellipse">
               <Style.Triggers>
@@ -88,6 +87,7 @@
             </Style>
           </Ellipse.Style>
         </Ellipse>
+        </Grid>
         <TextBlock Text="Speaker DSP" Style="{StaticResource H1}" VerticalAlignment="Center"/>
         <TextBlock Text="{Binding StatusText}" Foreground="{StaticResource Dim}" FontSize="11" Margin="12,1,0,0" VerticalAlignment="Center"/>
       </StackPanel>
