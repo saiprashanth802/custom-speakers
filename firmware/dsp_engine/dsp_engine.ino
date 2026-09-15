@@ -2,44 +2,82 @@
 // -----------------------------------------------------------------------------
 // Active-crossover DSP engine for ESP32-S3 + 2x PCM5102 + 4x TPA3118.
 //
-// STATUS: DSP chain, BLE control, NVS persistence, 48k/96k profile switch and
-// presets were all VERIFIED ON HARDWARE 2026-08-23 (see the memory / handoff
-// doc for the measurements). The 2026-09-15 additions — boot-profile restore,
-// post-switch status push, GET_PARAMS read-back — are COMPILED ONLY until the
-// board is next on the bench.
+// STATUS: DSP chain, BLE control, NVS persistence, 48k/96k profile switch,
+// presets, boot-profile restore and GET_PARAMS read-back were all VERIFIED ON
+// HARDWARE (2026-08-23, 2026-09-15). The USB audio source merged in on
+// 2026-09-15 is COMPILED ONLY in this build until the board is back on the
+// bench; the USB path itself was verified standalone the same day in
+// firmware/uac_test (24/48 and 24/96, see WIRING.md).
 //
 // What it does:
-//   * Synthesizes a two-tone test input (200 Hz + 5 kHz) as a stand-in for a
-//     real USB/WiFi source (still the open item — see INTERFACE.md).
+//   * Presents itself to the PC as a USB Audio Class 1.0 stereo speaker
+//     ("Speaker DSP", 24-bit, 48 k and 96 k, asynchronous with a feedback
+//     endpoint) plus a CDC console. The PC's audio stream IS the input.
 //   * Runs the full chain: Voicing EQ (stereo) -> LR4 crossover -> per-driver
 //     EQ / level / delay -> 4 outputs.
 //   * LOW band  -> I2S0 -> PCM5102 LOW  (L=L-woofer,  R=R-woofer).
 //     HIGH band -> I2S1 -> PCM5102 HIGH (L=L-tweeter, R=R-tweeter).
-//   * Audible check: with a 2.5 kHz crossover, the woofers get the 200 Hz tone
-//     and the tweeters get the 5 kHz tone. That alone proves the split works.
+//     Both DACs are fed 24-in-32-bit slots.
+//   * The SAMPLE RATE FOLLOWS THE HOST: when Windows selects 48 k or 96 k the
+//     engine re-clocks I2S and re-designs the biquads for that rate. The app's
+//     High-Res toggle still works while nothing is streaming (bench use) and is
+//     refused (ACK 3) while a USB stream owns the rate.
 //   * Built-in PROFILER: measures real cycles/sample and cycles/biquad on the
-//     S3 and prints them, so we can replace the 30-cycle estimate in DSP.md and
-//     confirm the 96 kHz budget. Flip SAMPLE_RATE to 96000 to see the delta.
+//     S3 and prints them alongside the USB stream counters.
+//   * IDLE_TEST_TONES: the original two-tone generator (200 Hz + 5 kHz), off by
+//     default, for a bench without a PC stream.
 //
-// Audio runs on core 1 (dedicated); serial/stats on core 0. Amps held muted at
-// boot, un-muted after I2S is up (pop-free; see WIRING.md).
+// Cores: audio on core 1 (dedicated). USB.begin() is called from a task pinned
+// to core 0 so the USB interrupt and the usbd task land there, next to BLE.
+// Amps held muted at boot, un-muted after I2S is up (pop-free; see WIRING.md).
+//
+// BUILD (USB-OTG mode, CDC not on boot — the audio interface must be registered
+// before USB.begin(), and CDCOnBoot=cdc starts USB before setup() runs):
+//   arduino-cli compile --fqbn esp32:esp32:esp32s3:USBMode=default,CDCOnBoot=default firmware/dsp_engine
+// FLASH: the console is a TinyUSB CDC port; esptool's reset dance does not trip
+// it reliably. Run tools/uactool/cdcboot.ps1 twice (drops to the ROM bootloader,
+// which enumerates as COM3 here), then upload with -p COM3. Or hold BOOT.
 //
 // REQUIRES: ESP32 Arduino core >= 3.0 (ESP_I2S / I2SClass).
 // PCM5102 straps: SCK->GND, FMT->GND, XSMT->3V3, FLT->GND, DEMP->GND.
 // -----------------------------------------------------------------------------
 
+#include "uac_config.h"          // must precede every TinyUSB header
 #include <ESP_I2S.h>
 #include <atomic>
 #include <Preferences.h>
 #include <NimBLEDevice.h>
+#include "USB.h"
+#include "USBCDC.h"
+#include "esp32-hal-tinyusb.h"
+#include "class/audio/audio_device.h"
+#include "device/usbd_pvt.h"
+#include "portable/synopsys/dwc2/dwc2_type.h"
+#include "uac_desc.h"
 #include "dsp_params.h"
 #include "protocol.h"
+
+// Console = the TinyUSB CDC interface. The core only instantiates USBSerial when
+// CDCOnBoot=cdc, and with it off `Serial` is the UART on GPIO43/44 that nothing
+// listens to; point it at our own CDC object instead. Writes are dropped while
+// no terminal holds DTR, so logging never blocks.
+USBCDC USBSerial(0);
+#undef  Serial
+#define Serial USBSerial
+
+#ifndef IDLE_TEST_TONES
+#define IDLE_TEST_TONES 0        // 1 = play the two-tone test signal whenever USB is idle
+#endif
 #pragma GCC optimize ("O3")   // DSP hot path: optimize for speed, not size
 
 // ---- Pins (match WIRING.md / schematic.html) --------------------------------
 constexpr int8_t I2S0_BCLK = 4,  I2S0_LRCK = 5,  I2S0_DOUT = 6;   // LOW DAC
 constexpr int8_t I2S1_BCLK = 7,  I2S1_LRCK = 8,  I2S1_DOUT = 9;   // HIGH DAC
-constexpr int8_t PIN_MUTE  = 10;                                  // amp mute NPNs
+// Amp mute: one NPN per TPA3118 MUTE header, one GPIO per NPN (WIRING.md, decided
+// 2026-09-15) so channels can be muted singly during bring-up; the engine gangs
+// them. GPIO high = transistor on = header shorted. Whether "shorted" is mute or
+// un-mute is measured per board; MUTE_ACTIVE_HIGH flips the whole set at once.
+constexpr int8_t PIN_MUTE[4] = {10, 11, 12, 13};                   // Lw, Rw, Lt, Rt
 constexpr bool   MUTE_ACTIVE_HIGH = true;
 
 // ---- Engine config ----------------------------------------------------------
@@ -64,7 +102,20 @@ volatile uint32_t g_pendingRate = 0;             // audio task applies this betw
 volatile bool     g_userMuted   = false;         // user mute intent (survives a profile switch)
 volatile bool     g_rateChanged = false;         // audio task -> loop(): push EVT_STATUS after a switch
 volatile bool     g_dumpParams  = false;         // BLE handler -> loop(): stream the param read-back
+static Profile    g_profile     = PROFILE_NORMAL; // derived from g_sampleRate; reported in EVT_STATUS
 SemaphoreHandle_t g_rebuildMux  = nullptr;       // serializes rebuild() across the two cores
+
+// ---- USB audio source state -------------------------------------------------
+// Written from the usbd task / USB ISR (core 0), read by the audio task and loop().
+static uint8_t   g_epOut = 0, g_epFb = 0;
+static uint8_t   g_itfStreaming = 0xFF;          // AS interface number, learnt from the descriptor cb
+volatile bool     g_usbStreaming = false;        // host selected the streaming alt setting
+volatile uint32_t g_usbRate      = SAMPLE_RATE;  // last SET_CUR sampling frequency from the host
+volatile uint32_t g_usbPkts = 0, g_usbUnderruns = 0, g_usbRateSets = 0;
+volatile uint16_t g_usbFifoNow = 0;
+static uint8_t    g_usbMute[UAC_CH + 1];
+static int16_t    g_usbVolume[UAC_CH + 1];       // dB as the host set them; not applied (master gain is the app's)
+extern "C" volatile uint32_t g_uac_iso_alloc_fail;   // from audio_device.c: RX FIFO allocation result at configuration
 
 // ---- Compiled coefficient sets (rebuilt from `params`) ----------------------
 struct DelayLine {
@@ -187,10 +238,19 @@ static inline void processFrame(Compiled& C, float xL, float xR, float out[4]) {
   }
 }
 
-static inline int16_t f2s16(float x) {
+// 24-bit sample left-aligned in a 32-bit I2S slot (the PCM5102 uses the top 24).
+// Scaled to 2^23-1 and shifted so a float rounding excursion at +1.0 cannot
+// overflow the int conversion.
+static inline int32_t f2s32(float x) {
   if (x >  1.0f) x =  1.0f;
   if (x < -1.0f) x = -1.0f;
-  return (int16_t)(x * 32767.0f);
+  return (int32_t)(x * 8388607.0f) << 8;
+}
+
+// USB 24-bit packed little-endian -> float in [-1, 1).
+static inline float s24f(const uint8_t* p) {
+  int32_t v = (int32_t)((uint32_t)p[0] << 8 | (uint32_t)p[1] << 16 | (uint32_t)p[2] << 24);
+  return (float)v * (1.0f / 2147483648.0f);
 }
 
 // ---- Shared profiler stats (core1 writes, core0 prints) ---------------------
@@ -199,17 +259,20 @@ volatile uint32_t g_activeBiquads   = 0;
 
 void setAmpsMuted(bool m) {
   bool level = MUTE_ACTIVE_HIGH ? m : !m;
-  digitalWrite(PIN_MUTE, level ? HIGH : LOW);
+  for (int8_t pin : PIN_MUTE) digitalWrite(pin, level ? HIGH : LOW);
 }
 
 // ---- Audio task (pinned to core 1) ------------------------------------------
 void audioTask(void*) {
-  static int16_t lowBuf[FRAMES * 2];    // L=Lw, R=Rw  -> I2S0
-  static int16_t highBuf[FRAMES * 2];   // L=Lt, R=Rt  -> I2S1
-  static float   xin[FRAMES];           // pre-generated input (kept out of the timed region)
+  static int32_t lowBuf[FRAMES * 2];    // L=Lw, R=Rw  -> I2S0 (24-in-32 slots)
+  static int32_t highBuf[FRAMES * 2];   // L=Lt, R=Rt  -> I2S1
+  static float   xL[FRAMES], xR[FRAMES];// input block (filled outside the timed region)
+  static uint8_t usbIn[FRAMES * UAC_FRAME_BYTES];
+#if IDLE_TEST_TONES
   float phaseLo = 0, phaseHi = 0;
   float incLo = 2.0f * (float)M_PI * TONE_LO_HZ / g_sampleRate;
   float incHi = 2.0f * (float)M_PI * TONE_HI_HZ / g_sampleRate;
+#endif
 
   for (;;) {
     // --- apply a pending profile / sample-rate switch (owned by this core) ---
@@ -222,11 +285,14 @@ void audioTask(void*) {
         rebuild(params);                    // recompute coeffs for the new fs
         i2sLow.setPins (I2S0_BCLK, I2S0_LRCK, I2S0_DOUT, -1, -1);
         i2sHigh.setPins(I2S1_BCLK, I2S1_LRCK, I2S1_DOUT, -1, -1);
-        i2sLow.begin (I2S_MODE_STD, pend, I2S_DATA_BIT_WIDTH_16BIT, I2S_SLOT_MODE_STEREO);
-        i2sHigh.begin(I2S_MODE_STD, pend, I2S_DATA_BIT_WIDTH_16BIT, I2S_SLOT_MODE_STEREO);
+        i2sLow.begin (I2S_MODE_STD, pend, I2S_DATA_BIT_WIDTH_32BIT, I2S_SLOT_MODE_STEREO);
+        i2sHigh.begin(I2S_MODE_STD, pend, I2S_DATA_BIT_WIDTH_32BIT, I2S_SLOT_MODE_STEREO);
         g_sampleRate = pend;
+        g_profile    = (pend == 96000) ? PROFILE_HIRES : PROFILE_NORMAL;
+#if IDLE_TEST_TONES
         incLo = 2.0f * (float)M_PI * TONE_LO_HZ / pend;
         incHi = 2.0f * (float)M_PI * TONE_HI_HZ / pend;
+#endif
         delay(80);                          // let the DACs relock
         setAmpsMuted(g_userMuted);          // restore the user's mute intent
         g_rateChanged = true;               // loop() (core 0) notifies the app; no BLE from this core
@@ -234,26 +300,47 @@ void audioTask(void*) {
       g_pendingRate = 0;
     }
 
-    // --- untimed: synthesize the two-tone test input (200 Hz + 5 kHz) ---
-    for (size_t f = 0; f < FRAMES; f++) {
-      xin[f] = TONE_AMP * (sinf(phaseLo) + sinf(phaseHi));
-      phaseLo += incLo; if (phaseLo >= 2 * M_PI) phaseLo -= 2 * M_PI;
-      phaseHi += incHi; if (phaseHi >= 2 * M_PI) phaseHi -= 2 * M_PI;
+    // --- untimed: fetch one block of input ---
+    // USB frames come out of the class driver's software FIFO, which the feedback
+    // endpoint keeps regulated to half full, so a full block is normally waiting.
+    // Anything else (no stream, or a momentary shortfall) is silence — never a
+    // partial block, which would shift the stream against the DAC clock.
+    bool haveUsb = g_usbStreaming && g_usbRate == g_sampleRate
+                && tud_audio_available() >= sizeof(usbIn);
+    if (haveUsb) {
+      tud_audio_read(usbIn, sizeof(usbIn));
+      const uint8_t* p = usbIn;
+      for (size_t f = 0; f < FRAMES; f++, p += UAC_FRAME_BYTES) {
+        xL[f] = s24f(p);
+        xR[f] = s24f(p + UAC_BYTES);
+      }
+    } else {
+      if (g_usbStreaming) g_usbUnderruns++;
+#if IDLE_TEST_TONES
+      for (size_t f = 0; f < FRAMES; f++) {
+        xL[f] = xR[f] = TONE_AMP * (sinf(phaseLo) + sinf(phaseHi));
+        phaseLo += incLo; if (phaseLo >= 2 * M_PI) phaseLo -= 2 * M_PI;
+        phaseHi += incHi; if (phaseHi >= 2 * M_PI) phaseHi -= 2 * M_PI;
+      }
+#else
+      memset(xL, 0, sizeof xL);
+      memset(xR, 0, sizeof xR);
+#endif
     }
 
     // Grab the active coefficient buffer once per block (atomic; a BLE param
     // update swaps it between blocks, never mid-block).
     Compiled& C = *Cactive.load(std::memory_order_acquire);
 
-    // --- timed: pure DSP (processFrame + int conversion), no tone-gen ---
+    // --- timed: pure DSP (processFrame + int conversion), no input handling ---
     uint32_t t0 = ESP.getCycleCount();
     for (size_t f = 0; f < FRAMES; f++) {
       float out[4];
-      processFrame(C, xin[f], xin[f], out);
-      lowBuf[2 * f]      = f2s16(out[0]);   // L-woofer
-      lowBuf[2 * f + 1]  = f2s16(out[1]);   // R-woofer
-      highBuf[2 * f]     = f2s16(out[2]);   // L-tweeter
-      highBuf[2 * f + 1] = f2s16(out[3]);   // R-tweeter
+      processFrame(C, xL[f], xR[f], out);
+      lowBuf[2 * f]      = f2s32(out[0]);   // L-woofer
+      lowBuf[2 * f + 1]  = f2s32(out[1]);   // R-woofer
+      highBuf[2 * f]     = f2s32(out[2]);   // L-tweeter
+      highBuf[2 * f + 1] = f2s32(out[3]);   // R-tweeter
     }
     uint32_t dt = ESP.getCycleCount() - t0;   // uint32 wrap is fine
     g_cyclesPerSample = (float)dt / FRAMES;
@@ -263,6 +350,163 @@ void audioTask(void*) {
     i2sLow.write((uint8_t*)lowBuf,  sizeof(lowBuf));
     i2sHigh.write((uint8_t*)highBuf, sizeof(highBuf));
   }
+}
+
+// =============================================================================
+// USB audio source (UAC 1.0) — descriptor, control requests, feedback, RX FIFO
+// =============================================================================
+// The class driver (audio_device.c) is registered in uac_glue.cpp. Everything
+// here runs in the usbd task or the USB ISR on core 0; it only sets flags and
+// counters — no Serial, no BLE, no I2S from these callbacks.
+
+// Configuration-descriptor contribution, called while the core assembles the
+// descriptor. Interfaces are numbered in enum order (CDC first), so *itf is
+// already past the console.
+static uint16_t loadUacDescriptor(uint8_t* dst, uint8_t* itf) {
+  uint8_t str = tinyusb_add_string_descriptor("Speaker DSP");
+  g_epOut = tinyusb_get_free_out_endpoint();
+  g_epFb  = tinyusb_get_free_in_endpoint();
+  g_itfStreaming = *itf + 1;
+  uint8_t desc[] = {
+    UAC1_SPEAKER_STEREO_FB_DESCRIPTOR(*itf, str, UAC_BYTES, UAC_BITS, g_epOut, UAC_EP_SZ,
+                                      (uint8_t)(0x80 | g_epFb), 48000, 96000)
+  };
+  static_assert(sizeof(desc) == UAC1_SPEAKER_STEREO_FB_DESC_LEN(2), "descriptor length mismatch");
+  *itf += 2;
+  memcpy(dst, desc, sizeof(desc));
+  return sizeof(desc);
+}
+
+// RX FIFO: TinyUSB's DWC2 driver wants 2 x (largest OUT packet) + 30 words and the
+// S3 has 256 in total, so the 582-byte endpoint's allocation fails silently at
+// configuration and every ISO packet would be dropped (measured 2026-09-15 in
+// uac_test: iso_alloc_fail=1, 0 packets). 1 x the packet is enough — the ISR
+// drains it well inside the 1 ms frame — so grow GRXFSIZ up to the bottom of
+// the lowest TX FIFO when the host opens the stream. Must be re-done after every
+// bus reset: the driver re-initialises the register to 62 words. 24/96 verified
+// with exactly this on 2026-09-15 (96000 frames/s, 0 underruns over 10 s).
+static void enlargeRxFifo() {
+  dwc2_regs_t* dwc2 = (dwc2_regs_t*)0x60080000UL;          // DWC2_FS_REG_BASE on the S3
+  uint16_t lowest = dwc2->dieptxf0 & 0xFFFF;                // every TX FIFO sits above its start
+  for (int n = 0; n < 6; n++) {
+    uint32_t f = dwc2->dieptxf[n];
+    if ((f >> 16) && (f & 0xFFFF) < lowest) lowest = f & 0xFFFF;
+  }
+  if ((dwc2->grxfsiz & 0xFFFF) >= lowest) return;
+  dwc2->grxfsiz = lowest;
+  dwc2->grstctl = GRSTCTL_RXFFLSH;                          // flush so the new size takes effect
+  while (dwc2->grstctl & GRSTCTL_RXFFLSH_Msk) {}
+}
+
+// Sampling frequency (UAC1: an endpoint control). The host's choice becomes the
+// engine's rate: the audio task performs the same mute -> re-clock -> re-design
+// switch the app's profile toggle uses. The driver re-prepares the feedback
+// parameters right after this callback, so the new rate is what it regulates to.
+extern "C" bool tud_audio_set_req_ep_cb(uint8_t rhport, tusb_control_request_t const* req, uint8_t* buf) {
+  (void)rhport;
+  if (TU_U16_HIGH(req->wValue) == AUDIO10_EP_CTRL_SAMPLING_FREQ && req->bRequest == AUDIO10_CS_REQ_SET_CUR) {
+    TU_VERIFY(req->wLength == 3);
+    uint32_t r = tu_unaligned_read32(buf) & 0x00FFFFFF;
+    if (!validRate(r)) return false;
+    g_usbRate = r;
+    g_usbRateSets++;
+    if (r != g_sampleRate) g_pendingRate = r;
+    return true;
+  }
+  return false;
+}
+
+extern "C" bool tud_audio_get_req_ep_cb(uint8_t rhport, tusb_control_request_t const* req) {
+  if (TU_U16_HIGH(req->wValue) == AUDIO10_EP_CTRL_SAMPLING_FREQ && req->bRequest == AUDIO10_CS_REQ_GET_CUR) {
+    uint32_t r = g_usbRate;
+    uint8_t f[3] = { (uint8_t)r, (uint8_t)(r >> 8), (uint8_t)(r >> 16) };
+    return tud_audio_buffer_and_schedule_control_xfer(rhport, req, f, 3);
+  }
+  return false;
+}
+
+// Feature unit: Windows will not open the endpoint unless mute and volume answer.
+// The values are accepted and remembered but not applied — level lives in the
+// app's master gain, and Windows attenuates in software in shared mode anyway.
+extern "C" bool tud_audio_set_req_entity_cb(uint8_t rhport, tusb_control_request_t const* req, uint8_t* buf) {
+  (void)rhport;
+  uint8_t ch = TU_U16_LOW(req->wValue), sel = TU_U16_HIGH(req->wValue), ent = TU_U16_HIGH(req->wIndex);
+  if (ent != UAC1_ENTITY_FEATURE_UNIT || req->bRequest != AUDIO10_CS_REQ_SET_CUR || ch > UAC_CH) return false;
+  if (sel == AUDIO10_FU_CTRL_MUTE)   { TU_VERIFY(req->wLength == 1); g_usbMute[ch] = buf[0]; return true; }
+  if (sel == AUDIO10_FU_CTRL_VOLUME) { TU_VERIFY(req->wLength == 2); g_usbVolume[ch] = (int16_t)tu_unaligned_read16(buf) / 256; return true; }
+  return false;
+}
+
+extern "C" bool tud_audio_get_req_entity_cb(uint8_t rhport, tusb_control_request_t const* req) {
+  uint8_t ch = TU_U16_LOW(req->wValue), sel = TU_U16_HIGH(req->wValue), ent = TU_U16_HIGH(req->wIndex);
+  if (ent != UAC1_ENTITY_FEATURE_UNIT || ch > UAC_CH) return false;
+  if (sel == AUDIO10_FU_CTRL_MUTE) return tud_audio_buffer_and_schedule_control_xfer(rhport, req, &g_usbMute[ch], 1);
+  if (sel == AUDIO10_FU_CTRL_VOLUME) {
+    int16_t v;
+    switch (req->bRequest) {
+      case AUDIO10_CS_REQ_GET_CUR: v = g_usbVolume[ch] * 256; break;
+      case AUDIO10_CS_REQ_GET_MIN: v = -60 * 256;             break;
+      case AUDIO10_CS_REQ_GET_MAX: v = 0;                     break;
+      case AUDIO10_CS_REQ_GET_RES: v = 256;                   break;   // 1 dB steps
+      default: return false;
+    }
+    return tud_audio_buffer_and_schedule_control_xfer(rhport, req, &v, sizeof v);
+  }
+  return false;
+}
+
+extern "C" bool tud_audio_set_itf_cb(uint8_t rhport, tusb_control_request_t const* req) {
+  (void)rhport;
+  uint8_t itf = tu_u16_low(req->wIndex), alt = tu_u16_low(req->wValue);
+  if (itf == g_itfStreaming) {
+    if (alt != 0) enlargeRxFifo();          // endpoint idle: the host starts ISO after the status stage
+    g_usbStreaming = (alt != 0);
+  }
+  return true;
+}
+
+extern "C" bool tud_audio_set_itf_close_ep_cb(uint8_t rhport, tusb_control_request_t const* req) {
+  (void)rhport;
+  if (tu_u16_low(req->wIndex) == g_itfStreaming) g_usbStreaming = false;
+  return true;
+}
+
+// Feedback: the driver regulates its own FIFO to half full and derives Ff from
+// that. No SOF interrupt, no MCLK counter — the I2S clock free-runs and the host
+// follows the fill level.
+extern "C" void tud_audio_feedback_params_cb(uint8_t func, uint8_t alt, audio_feedback_params_t* p) {
+  (void)func; (void)alt;
+  p->method      = AUDIO_FEEDBACK_METHOD_FIFO_COUNT;
+  p->sample_freq = g_usbRate;
+}
+
+extern "C" bool tud_audio_rx_done_isr(uint8_t rhport, uint16_t n, uint8_t func, uint8_t ep, uint8_t alt) {
+  (void)rhport; (void)n; (void)func; (void)ep; (void)alt;
+  g_usbPkts++;
+  g_usbFifoNow = tud_audio_available();
+  return true;
+}
+
+// USB.begin() from a task pinned to core 0: the USB interrupt is allocated on the
+// calling core, and the ISR is what matters — it reads every ISO packet out of
+// the FIFO, and that belongs next to BLE on core 0, not on the audio core.
+static void usbStartTask(void* done) {
+  USB.begin();
+  *(volatile bool*)done = true;
+  vTaskDelete(nullptr);
+}
+
+static void setupUsb() {
+  USB.VID(0x303A);                    // Espressif's VID, as the core defaults
+  USB.PID(0xA3D5);                    // ours. Windows caches the audio endpoint per
+                                      // VID/PID/serial: change the PID if the formats change.
+  USB.productName("Speaker DSP");
+  USB.manufacturerName("sap");
+  USBSerial.begin();
+  tinyusb_enable_interface(USB_INTERFACE_CUSTOM, UAC1_SPEAKER_STEREO_FB_DESC_LEN(2), loadUacDescriptor);
+  volatile bool done = false;
+  xTaskCreatePinnedToCore(usbStartTask, "usbstart", 4096, (void*)&done, 2, nullptr, 0);
+  while (!done) delay(5);
 }
 
 // ---- Clean default config: crossover only, EQ off (the BLE app adds EQ) ------
@@ -325,7 +569,7 @@ static void presetKey(char* out, size_t n, int slot) { snprintf(out, n, "preset%
 // switch to the audio task; NVS save/load is live (see the Preferences block).
 // =============================================================================
 static NimBLECharacteristic* g_evt = nullptr;
-static Profile g_profile = PROFILE_NORMAL;
+
 
 static float  rdF32(const uint8_t* d, int off) { float f; memcpy(&f, d + off, 4); return f; }
 static uint16_t rdU16(const uint8_t* d, int off) { return (uint16_t)(d[off] | (d[off + 1] << 8)); }
@@ -413,8 +657,10 @@ static uint8_t dispatchCmd(const uint8_t* d, size_t n) {
     case CMD_SET_MUTE:         if (n < 2) return 1; g_userMuted = d[1] != 0; setAmpsMuted(g_userMuted); return 0;
     case CMD_SET_PROFILE: {
       if (n < 2) return 1;
-      g_profile = (Profile)d[1];
-      g_pendingRate = (g_profile == PROFILE_HIRES) ? 96000 : 48000;  // audio task switches it
+      // The USB host owns the rate while it streams; the toggle is for the bench
+      // (profiling at 96 k with nothing playing). ACK 3 = rate owned by USB.
+      if (g_usbStreaming) { sendStatus(); return 3; }
+      g_pendingRate = (d[1] == PROFILE_HIRES) ? 96000 : 48000;  // audio task switches it, sets g_profile
       sendStatus();
       return 0;
     }
@@ -516,10 +762,10 @@ void setupBle() {
 }
 
 void setup() {
-  pinMode(PIN_MUTE, OUTPUT);
+  for (int8_t pin : PIN_MUTE) pinMode(pin, OUTPUT);
   setAmpsMuted(true);                 // muted before anything comes up
 
-  Serial.begin(115200);
+  setupUsb();                         // CDC console + UAC speaker; enumerates while the rest boots
   delay(300);
   Serial.println("\n[dsp_engine] boot (amps muted)");
 
@@ -532,14 +778,15 @@ void setup() {
   // that rate. g_sampleRate must be final before audioTask starts (it derives
   // the tone increments from it once).
   g_sampleRate = params.sampleRate;
+  g_usbRate    = g_sampleRate;        // until the host says otherwise
   g_profile    = (g_sampleRate == 96000) ? PROFILE_HIRES : PROFILE_NORMAL;
   rebuild(params);
 
   const uint32_t bootRate = g_sampleRate;
   i2sLow.setPins (I2S0_BCLK, I2S0_LRCK, I2S0_DOUT, -1, -1);
   i2sHigh.setPins(I2S1_BCLK, I2S1_LRCK, I2S1_DOUT, -1, -1);
-  bool ok = i2sLow.begin (I2S_MODE_STD, bootRate, I2S_DATA_BIT_WIDTH_16BIT, I2S_SLOT_MODE_STEREO)
-         && i2sHigh.begin(I2S_MODE_STD, bootRate, I2S_DATA_BIT_WIDTH_16BIT, I2S_SLOT_MODE_STEREO);
+  bool ok = i2sLow.begin (I2S_MODE_STD, bootRate, I2S_DATA_BIT_WIDTH_32BIT, I2S_SLOT_MODE_STEREO)
+         && i2sHigh.begin(I2S_MODE_STD, bootRate, I2S_DATA_BIT_WIDTH_32BIT, I2S_SLOT_MODE_STEREO);
   if (!ok) {
     Serial.println("[dsp_engine] I2S begin FAILED (core >=3.0? two I2S ports?)");
     while (true) delay(1000);         // stay muted
@@ -552,8 +799,8 @@ void setup() {
   setAmpsMuted(false);
 
   setupBle();                         // advertise the DSP control service
-  Serial.printf("[dsp_engine] running @ %lu Hz (%s), un-muted, BLE 'SpeakerDSP' advertising\n",
-                (unsigned long)bootRate, g_profile == PROFILE_HIRES ? "High-Res" : "Normal");
+  Serial.printf("[dsp_engine] running @ %lu Hz (%s), un-muted, BLE 'SpeakerDSP' advertising, USB ep out 0x%02x fb 0x%02x\n",
+                (unsigned long)bootRate, g_profile == PROFILE_HIRES ? "High-Res" : "Normal", g_epOut, 0x80 | g_epFb);
 }
 
 void loop() {
@@ -572,7 +819,13 @@ void loop() {
   float loadPct = 100.0f * cps * rate / coreHz;    // % of one core
   float cpb     = nb ? cps / nb : 0;
 
+  static uint32_t lastPkts = 0;
+  uint32_t pk = g_usbPkts;
   Serial.printf("[prof] %.1f cyc/sample | %lu biquads | %.1f cyc/biquad | "
-                "%.1f%% of one 240MHz core @ %lu Hz\n",
-                cps, (unsigned long)nb, cpb, loadPct, (unsigned long)rate);
+                "%.1f%% of one 240MHz core @ %lu Hz | usb %s host %lu Hz pkts/s %lu fifo %u underrun %lu%s\n",
+                cps, (unsigned long)nb, cpb, loadPct, (unsigned long)rate,
+                g_usbStreaming ? "RUN" : "idle", (unsigned long)g_usbRate, (unsigned long)(pk - lastPkts),
+                g_usbFifoNow, (unsigned long)g_usbUnderruns,
+                g_uac_iso_alloc_fail ? " (rx fifo enlarged at stream start)" : "");
+  lastPkts = pk;
 }

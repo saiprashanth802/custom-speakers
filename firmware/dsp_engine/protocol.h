@@ -9,7 +9,7 @@
 #include <stdint.h>
 
 constexpr uint16_t PROTOCOL_VERSION = 1;
-constexpr uint16_t FW_VERSION       = 2;   // 2 = read-back + boot-profile restore
+constexpr uint16_t FW_VERSION       = 3;   // 2 = read-back + boot-profile restore; 3 = USB audio source
 
 // GATT UUIDs (base 9F3E7Axx-5C2B-4D8E-9A1F-6B0C1D2E3F40)
 #define DSP_SVC_UUID "9F3E7A00-5C2B-4D8E-9A1F-6B0C1D2E3F40"

@@ -219,9 +219,34 @@ Replace the shunt with a transistor across the two header pins. **NPN is fine**
 Physical plan: `PCM1 | ESP32-S3 | PCM2` across the top, `T1 T2 T3 T4` in a row
 below, **power distribution on an elevated tier** above the logic board (keeps
 the 24V high-current wiring off the signal layer). Each amp has its own local
-header, so **each amp gets its own NPN**, but **all four bases tie to one GPIO**
-(`GPIO10`, placeholder — any free pin outside the I2S set GPIO4–9) for a single
-global mute line. Split to 4 GPIOs only if per-channel bring-up is wanted.
+header, so **each amp gets its own NPN**, and **each NPN gets its own GPIO** so
+channels can be muted one at a time during bring-up; firmware gangs the four
+for the global mute.
+
+### Mute transistor pin assignment (decided 2026-09-15, not yet wired)
+
+| NPN | ESP32-S3 GPIO | Base            | Collector →            | Emitter →              | Amp / driver        |
+|-----|---------------|-----------------|------------------------|------------------------|---------------------|
+| T1  | `GPIO10`      | 1k series + 10k→GND | Amp 1 MUTE header pin A | header pin B / star GND | Amp 1 · L-Woofer   |
+| T2  | `GPIO11`      | 1k series + 10k→GND | Amp 2 MUTE header pin A | header pin B / star GND | Amp 2 · R-Woofer   |
+| T3  | `GPIO12`      | 1k series + 10k→GND | Amp 3 MUTE header pin A | header pin B / star GND | Amp 3 · L-Tweeter  |
+| T4  | `GPIO13`      | 1k series + 10k→GND | Amp 4 MUTE header pin A | header pin B / star GND | Amp 4 · R-Tweeter  |
+
+- **Why GPIO10–13:** outside the I2S set (4–9), not strapping (0/3/45/46), not
+  native USB (19/20 — in use for UAC), not octal-PSRAM (35–37). They are the
+  FSPI (SPI2) pins, which nothing on this board uses. Confirm all four are on
+  the silkscreen of the specific S3 Mini clone before soldering.
+- **Header pin A vs B:** measure per board (item 2 above); do not assume the
+  four boards are oriented the same way.
+- **TO-92 leg order, flat face toward you, legs down:** **BC547 = C·B·E**;
+  **2N3904 / 2N2222A = E·B·C** (reversed). A swapped C/E runs the NPN in
+  reverse-active mode with tiny gain and will not pull the header low reliably.
+- **10k base pull-down** so a floating GPIO at reset = transistor off = header
+  open. If the bench test shows *shorted = mute*, use a 10k pull-**up** to 3V3
+  instead so floating = shorted = muted (see fail-safe below).
+- **Firmware:** `PIN_MUTE = 10` → `PIN_MUTE[4] = {10, 11, 12, 13}`,
+  `setAmpsMuted()` writes all four. Done in `dsp_engine.ino` on branch `usb-dsp`
+  (2026-09-15, compiled only — the four NPNs are not wired yet).
 
 ### Fail-safe / pop-free sequence
 
