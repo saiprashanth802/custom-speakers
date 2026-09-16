@@ -86,13 +86,13 @@ config pins; a bridge overrides whatever is wired to the header pin.
 | XMT (=XSMT)| H3L    | soft mute, active-high | **H** (unmuted) — floating/low is the classic "everything's wired right but it's silent" bug |
 | FLT        | H1L    | filter select          | **L** (normal latency filter) |
 | DMP (=DEMP)| H2L    | de-emphasis            | **L** (off) |
+| VCC        | —      | board supply           | 5V from the ESP32 5V pin (on-board LDO makes 3.3V) |
 
 Both boards were verified by ear 2026-09-16. The DAC on GPIO 4/5/6 was silent
 with everything above correct: **LCK and DIN were crossed** on that module.
 Diagnosis that worked, in two steps: flash the on-board tone build
 (`IDLE_TEST_TONES=1`), then move the *known-good* module's three I2S wires
 to the silent port — if it plays there, the fault is in the other module.
-| VIN  | board supply            | 5V (check your specific board — some want 3.3V direct) |
 
 ## Amp input/output
 
