@@ -115,8 +115,13 @@ volatile bool     g_usbStreaming = false;        // host selected the streaming 
 volatile uint32_t g_usbRate      = SAMPLE_RATE;  // last SET_CUR sampling frequency from the host
 volatile uint32_t g_usbPkts = 0, g_usbUnderruns = 0, g_usbRateSets = 0;
 volatile uint16_t g_usbFifoNow = 0;
-static uint8_t    g_usbMute[UAC_CH + 1];
-static int16_t    g_usbVolume[UAC_CH + 1];       // dB as the host set them; not applied (master gain is the app's)
+volatile uint32_t g_usbLastPktTick = 0;          // so a paused host (alt 1, no packets) is not counted as underruns
+static uint8_t    g_usbMute[UAC_CH + 1];         // [0] master, [1] L, [2] R — 1 = muted
+static int16_t    g_usbVolume[UAC_CH + 1];       // dB as the host set them, -60..0 (GET_MIN/MAX below)
+// Host volume as a linear gain per channel, master and channel controls combined
+// (Windows drives the master; a per-channel SET_CUR still counts). The audio task
+// ramps toward it over a few ms so slider moves don't zipper.
+volatile float    g_usbGainTarget[UAC_CH] = {1.0f, 1.0f};   // usbGainUpdate() below dB2lin (prototype-generator gotcha)
 extern "C" volatile uint32_t g_uac_iso_alloc_fail;   // from audio_device.c: RX FIFO allocation result at configuration
 
 // ---- Compiled coefficient sets (rebuilt from `params`) ----------------------
@@ -160,6 +165,18 @@ Compiled Cbuf[2];
 std::atomic<Compiled*> Cactive{ &Cbuf[0] };
 
 static inline float dB2lin(float db) { return powf(10.0f, db / 20.0f); }
+
+// Host (USB feature unit) mute/volume -> g_usbGainTarget. Windows writes the SAME
+// dB to the master and to each channel (measured: "vol -10/-10/-10"), so they must
+// not be summed; the more attenuated of master and channel is right for Windows
+// and for a host that drives only one of them.
+static void usbGainUpdate() {
+  for (int c = 0; c < UAC_CH; c++) {
+    bool muted = g_usbMute[0] || g_usbMute[c + 1];
+    int  dB    = g_usbVolume[0] < g_usbVolume[c + 1] ? g_usbVolume[0] : g_usbVolume[c + 1];
+    g_usbGainTarget[c] = muted ? 0.0f : dB2lin((float)dB);
+  }
+}
 // Kept below the first function on purpose: the Arduino prototype generator
 // inserts every prototype before the first function definition in the file,
 // and those prototypes reference `Compiled`, so the first function must come
@@ -243,11 +260,29 @@ static inline void processFrame(Compiled& C, float xL, float xR, float out[4]) {
 // 24-bit sample left-aligned in a 32-bit I2S slot (the PCM5102 uses the top 24).
 // Scaled to 2^23-1 and shifted so a float rounding excursion at +1.0 cannot
 // overflow the int conversion.
+// I2S_16BIT_SLOTS=1 rebuilds the output path exactly as the 2026-08-23 verified
+// engine had it (16-bit slots), for A/B against the 24-in-32 path on the bench.
+#ifndef I2S_16BIT_SLOTS
+#define I2S_16BIT_SLOTS 0
+#endif
+#if I2S_16BIT_SLOTS
+typedef int16_t i2s_sample_t;
+#define I2S_SLOT_WIDTH I2S_DATA_BIT_WIDTH_16BIT
+static inline int16_t toSlot(float x) {
+  if (x >  1.0f) x =  1.0f;
+  if (x < -1.0f) x = -1.0f;
+  return (int16_t)(x * 32767.0f);
+}
+#else
+typedef int32_t i2s_sample_t;
+#define I2S_SLOT_WIDTH I2S_DATA_BIT_WIDTH_32BIT
 static inline int32_t f2s32(float x) {
   if (x >  1.0f) x =  1.0f;
   if (x < -1.0f) x = -1.0f;
   return (int32_t)(x * 8388607.0f) << 8;
 }
+static inline int32_t toSlot(float x) { return f2s32(x); }
+#endif
 
 // USB 24-bit packed little-endian -> float in [-1, 1).
 static inline float s24f(const uint8_t* p) {
@@ -266,10 +301,12 @@ void setAmpsMuted(bool m) {
 
 // ---- Audio task (pinned to core 1) ------------------------------------------
 void audioTask(void*) {
-  static int32_t lowBuf[FRAMES * 2];    // L=Lw, R=Rw  -> I2S0 (24-in-32 slots)
-  static int32_t highBuf[FRAMES * 2];   // L=Lt, R=Rt  -> I2S1
+  static i2s_sample_t lowBuf[FRAMES * 2];    // L=Lw, R=Rw  -> I2S0 (24-in-32 slots)
+  static i2s_sample_t highBuf[FRAMES * 2];   // L=Lt, R=Rt  -> I2S1
   static float   xL[FRAMES], xR[FRAMES];// input block (filled outside the timed region)
   static uint8_t usbIn[FRAMES * UAC_FRAME_BYTES];
+  static float   usbGainL = 1.0f, usbGainR = 1.0f;   // host volume, smoothed toward g_usbGainTarget
+  constexpr float USB_GAIN_RAMP = 0.002f;            // one-pole per sample: ~5 ms @ 96 k, ~10 ms @ 48 k
 #if IDLE_TEST_TONES
   float phaseLo = 0, phaseHi = 0;
   float incLo = 2.0f * (float)M_PI * TONE_LO_HZ / g_sampleRate;
@@ -287,8 +324,8 @@ void audioTask(void*) {
         rebuild(params);                    // recompute coeffs for the new fs
         i2sLow.setPins (I2S0_BCLK, I2S0_LRCK, I2S0_DOUT, -1, -1);
         i2sHigh.setPins(I2S1_BCLK, I2S1_LRCK, I2S1_DOUT, -1, -1);
-        i2sLow.begin (I2S_MODE_STD, pend, I2S_DATA_BIT_WIDTH_32BIT, I2S_SLOT_MODE_STEREO);
-        i2sHigh.begin(I2S_MODE_STD, pend, I2S_DATA_BIT_WIDTH_32BIT, I2S_SLOT_MODE_STEREO);
+        i2sLow.begin (I2S_MODE_STD, pend, I2S_SLOT_WIDTH, I2S_SLOT_MODE_STEREO);
+        i2sHigh.begin(I2S_MODE_STD, pend, I2S_SLOT_WIDTH, I2S_SLOT_MODE_STEREO);
         g_sampleRate = pend;
         g_profile    = (pend == 96000) ? PROFILE_HIRES : PROFILE_NORMAL;
 #if IDLE_TEST_TONES
@@ -312,12 +349,17 @@ void audioTask(void*) {
     if (haveUsb) {
       tud_audio_read(usbIn, sizeof(usbIn));
       const uint8_t* p = usbIn;
+      const float tL = g_usbGainTarget[0], tR = g_usbGainTarget[1];
       for (size_t f = 0; f < FRAMES; f++, p += UAC_FRAME_BYTES) {
-        xL[f] = s24f(p);
-        xR[f] = s24f(p + UAC_BYTES);
+        xL[f] = s24f(p)             * usbGainL;
+        xR[f] = s24f(p + UAC_BYTES) * usbGainR;
+        usbGainL += (tL - usbGainL) * USB_GAIN_RAMP;
+        usbGainR += (tR - usbGainR) * USB_GAIN_RAMP;
       }
     } else {
-      if (g_usbStreaming) g_usbUnderruns++;
+      // Windows keeps the alt setting selected while a player is merely paused and
+      // sends nothing; only a gap right after packets were flowing is a real underrun.
+      if (g_usbStreaming && (xTaskGetTickCount() - g_usbLastPktTick) < pdMS_TO_TICKS(50)) g_usbUnderruns++;
 #if IDLE_TEST_TONES
       for (size_t f = 0; f < FRAMES; f++) {
         xL[f] = xR[f] = TONE_AMP * (sinf(phaseLo) + sinf(phaseHi));
@@ -339,10 +381,10 @@ void audioTask(void*) {
     for (size_t f = 0; f < FRAMES; f++) {
       float out[4];
       processFrame(C, xL[f], xR[f], out);
-      lowBuf[2 * f]      = f2s32(out[0]);   // L-woofer
-      lowBuf[2 * f + 1]  = f2s32(out[1]);   // R-woofer
-      highBuf[2 * f]     = f2s32(out[2]);   // L-tweeter
-      highBuf[2 * f + 1] = f2s32(out[3]);   // R-tweeter
+      lowBuf[2 * f]      = toSlot(out[0]);   // L-woofer
+      lowBuf[2 * f + 1]  = toSlot(out[1]);   // R-woofer
+      highBuf[2 * f]     = toSlot(out[2]);   // L-tweeter
+      highBuf[2 * f + 1] = toSlot(out[3]);   // R-tweeter
     }
     uint32_t dt = ESP.getCycleCount() - t0;   // uint32 wrap is fine
     g_cyclesPerSample = (float)dt / FRAMES;
@@ -428,14 +470,14 @@ extern "C" bool tud_audio_get_req_ep_cb(uint8_t rhport, tusb_control_request_t c
 }
 
 // Feature unit: Windows will not open the endpoint unless mute and volume answer.
-// The values are accepted and remembered but not applied — level lives in the
-// app's master gain, and Windows attenuates in software in shared mode anyway.
+// Mute and volume are applied to the USB input (usbGainUpdate) so the Windows
+// volume slider works in exclusive mode too; the app's master gain sits on top.
 extern "C" bool tud_audio_set_req_entity_cb(uint8_t rhport, tusb_control_request_t const* req, uint8_t* buf) {
   (void)rhport;
   uint8_t ch = TU_U16_LOW(req->wValue), sel = TU_U16_HIGH(req->wValue), ent = TU_U16_HIGH(req->wIndex);
   if (ent != UAC1_ENTITY_FEATURE_UNIT || req->bRequest != AUDIO10_CS_REQ_SET_CUR || ch > UAC_CH) return false;
-  if (sel == AUDIO10_FU_CTRL_MUTE)   { TU_VERIFY(req->wLength == 1); g_usbMute[ch] = buf[0]; return true; }
-  if (sel == AUDIO10_FU_CTRL_VOLUME) { TU_VERIFY(req->wLength == 2); g_usbVolume[ch] = (int16_t)tu_unaligned_read16(buf) / 256; return true; }
+  if (sel == AUDIO10_FU_CTRL_MUTE)   { TU_VERIFY(req->wLength == 1); g_usbMute[ch] = buf[0]; usbGainUpdate(); return true; }
+  if (sel == AUDIO10_FU_CTRL_VOLUME) { TU_VERIFY(req->wLength == 2); g_usbVolume[ch] = (int16_t)tu_unaligned_read16(buf) / 256; usbGainUpdate(); return true; }
   return false;
 }
 
@@ -486,6 +528,7 @@ extern "C" bool tud_audio_rx_done_isr(uint8_t rhport, uint16_t n, uint8_t func, 
   (void)rhport; (void)n; (void)func; (void)ep; (void)alt;
   g_usbPkts++;
   g_usbFifoNow = tud_audio_available();
+  g_usbLastPktTick = xTaskGetTickCountFromISR();
   return true;
 }
 
@@ -787,8 +830,8 @@ void setup() {
   const uint32_t bootRate = g_sampleRate;
   i2sLow.setPins (I2S0_BCLK, I2S0_LRCK, I2S0_DOUT, -1, -1);
   i2sHigh.setPins(I2S1_BCLK, I2S1_LRCK, I2S1_DOUT, -1, -1);
-  bool ok = i2sLow.begin (I2S_MODE_STD, bootRate, I2S_DATA_BIT_WIDTH_32BIT, I2S_SLOT_MODE_STEREO)
-         && i2sHigh.begin(I2S_MODE_STD, bootRate, I2S_DATA_BIT_WIDTH_32BIT, I2S_SLOT_MODE_STEREO);
+  bool ok = i2sLow.begin (I2S_MODE_STD, bootRate, I2S_SLOT_WIDTH, I2S_SLOT_MODE_STEREO)
+         && i2sHigh.begin(I2S_MODE_STD, bootRate, I2S_SLOT_WIDTH, I2S_SLOT_MODE_STEREO);
   if (!ok) {
     Serial.println("[dsp_engine] I2S begin FAILED (core >=3.0? two I2S ports?)");
     while (true) delay(1000);         // stay muted
@@ -824,10 +867,12 @@ void loop() {
   static uint32_t lastPkts = 0;
   uint32_t pk = g_usbPkts;
   Serial.printf("[prof] %.1f cyc/sample | %lu biquads | %.1f cyc/biquad | "
-                "%.1f%% of one 240MHz core @ %lu Hz | usb %s host %lu Hz pkts/s %lu fifo %u underrun %lu%s\n",
+                "%.1f%% of one 240MHz core @ %lu Hz | usb %s host %lu Hz pkts/s %lu fifo %u underrun %lu vol %d/%d/%d dB%s%s\n",
                 cps, (unsigned long)nb, cpb, loadPct, (unsigned long)rate,
                 g_usbStreaming ? "RUN" : "idle", (unsigned long)g_usbRate, (unsigned long)(pk - lastPkts),
                 g_usbFifoNow, (unsigned long)g_usbUnderruns,
+                g_usbVolume[0], g_usbVolume[1], g_usbVolume[2],
+                (g_usbMute[0] || g_usbMute[1] || g_usbMute[2]) ? " MUTED" : "",
                 g_uac_iso_alloc_fail ? " (rx fifo enlarged at stream start)" : "");
   lastPkts = pk;
 }
