@@ -72,18 +72,26 @@ programming/power), GPIO35-37 (reserved if your module uses octal PSRAM).
 (SCK pin grounded) so BCK/WS/DIN (3 wires) per DAC is sufficient — don't
 need to route a 4th master-clock line from the ESP32.
 
-## PCM5102 board config pins
+## PCM5102 board config pins (as built: CJMCU-5102, 2026-09-16)
 
-Standard PCM5102 breakout modules expose these control pins — tie them as
-follows (verify your board's actual pinout/silkscreen, clones vary):
+The modules in use are **CJMCU-5102** boards. Header: VCC · 3.3V · GND · FLT ·
+DMP · SCL · BCK · DIN · LCK · FMT · XMT. Four solder bridges on the back
+(H1L–H4L: bridge the centre pad to **H** = 3.3V or **L** = GND) set the
+config pins; a bridge overrides whatever is wired to the header pin.
 
-| Pin  | Function              | Setting |
-|------|------------------------|---------|
-| SCK  | external MCLK in       | tie to GND (use internal PLL) |
-| FMT  | audio format select    | tie to GND (I2S standard format) |
-| XSMT | soft mute, active-high | tie to **3.3V** (unmuted) — leaving this floating/low is the classic "everything's wired right but it's silent" bug |
-| FLT  | filter select           | tie to GND (normal latency filter) |
-| DEMP | de-emphasis             | tie to GND (off) |
+| Header pin | Bridge | Function               | Setting |
+|------------|--------|------------------------|---------|
+| SCL (=SCK) | none   | external MCLK in       | **wire to GND** (internal PLL from BCK) — no bridge for this one, it must be a wire; floating = dead silent |
+| FMT        | H4L    | audio format select    | **L** (I2S standard format) |
+| XMT (=XSMT)| H3L    | soft mute, active-high | **H** (unmuted) — floating/low is the classic "everything's wired right but it's silent" bug |
+| FLT        | H1L    | filter select          | **L** (normal latency filter) |
+| DMP (=DEMP)| H2L    | de-emphasis            | **L** (off) |
+
+Both boards were verified by ear 2026-09-16. The DAC on GPIO 4/5/6 was silent
+with everything above correct: **LCK and DIN were crossed** on that module.
+Diagnosis that worked, in two steps: flash the on-board tone build
+(`IDLE_TEST_TONES=1`), then move the *known-good* module's three I2S wires
+to the silent port — if it plays there, the fault is in the other module.
 | VIN  | board supply            | 5V (check your specific board — some want 3.3V direct) |
 
 ## Amp input/output
