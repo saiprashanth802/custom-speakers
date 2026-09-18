@@ -443,6 +443,8 @@ public sealed class MainViewModel : Bindable
         finally { _silent = false; }
     }
 
+    public void LogLine(string s) => AddLog(s);   // for the shell (tray/install) messages
+
     private void AddLog(string s) => App.OnUi(() =>
     {
         LogLines.Insert(0, $"{DateTime.Now:HH:mm:ss}  {s}");
