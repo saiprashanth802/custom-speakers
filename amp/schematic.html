@@ -1,0 +1,580 @@
+<title>Active Crossover Schematic</title>
+<style>
+  :root {
+    --bg: #f7f7f5;
+    --panel: #ffffff;
+    --ink: #1a1a1a;
+    --muted: #6b6b6b;
+    --line: #333333;
+    --low: #2563eb;      /* low band / woofer */
+    --high: #d4380d;     /* high band / tweeter */
+    --pwr: #b91c1c;      /* 24V power */
+    --pwr5: #ca8a04;     /* 5V logic power */
+    --gnd: #15803d;      /* ground */
+    --box: #cfcfcf;
+    --box-fill: #fbfbfa;
+    --accent: #7c3aed;
+  }
+  :root:not([data-theme="light"]) {
+    @media (prefers-color-scheme: dark) {
+      --bg: #16171a;
+      --panel: #1f2024;
+      --ink: #ececec;
+      --muted: #9a9a9a;
+      --line: #b8b8b8;
+      --low: #60a5fa;
+      --high: #ff8a5b;
+      --pwr: #f87171;
+      --pwr5: #facc15;
+      --gnd: #4ade80;
+      --box: #3a3c42;
+      --box-fill: #26282d;
+      --accent: #a78bfa;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #16171a;
+    --panel: #1f2024;
+    --ink: #ececec;
+    --muted: #9a9a9a;
+    --line: #b8b8b8;
+    --low: #60a5fa;
+    --high: #ff8a5b;
+    --pwr: #f87171;
+    --pwr5: #facc15;
+    --gnd: #4ade80;
+    --box: #3a3c42;
+    --box-fill: #26282d;
+    --accent: #a78bfa;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 32px 20px 80px; }
+  h1 { font-size: 1.6rem; margin: 0 0 4px; letter-spacing: -0.01em; }
+  h2 { font-size: 1.15rem; margin: 40px 0 10px; letter-spacing: -0.01em; }
+  .sub { color: var(--muted); font-size: 0.92rem; margin: 0 0 24px; }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--box);
+    border-radius: 12px;
+    padding: 18px;
+    margin: 16px 0;
+    overflow-x: auto;
+  }
+  svg { display: block; width: 100%; height: auto; min-width: 640px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px 22px; font-size: 0.85rem; margin: 10px 2px 0; }
+  .legend span { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); }
+  .swatch { width: 22px; height: 3px; border-radius: 2px; display: inline-block; }
+  .swatch.dash { height: 0; border-top: 3px dashed; background: none; }
+  .note { font-size: 0.88rem; color: var(--muted); margin: 8px 2px 0; }
+  ul.note { padding-left: 18px; }
+  code { background: color-mix(in srgb, var(--ink) 8%, transparent); padding: 1px 5px; border-radius: 4px; font-size: 0.85em; }
+  text { font-family: ui-sans-serif, system-ui, sans-serif; }
+</style>
+
+<div class="wrap">
+  <h1>Active Crossover — Schematic &amp; Ground Path</h1>
+  <p class="sub">ESP32-S3 DSP · 2× PCM5102 (band-split) · 4× TPA3118 mono · 24V/150W · 2-way stereo</p>
+
+  <div class="legend">
+    <span><i class="swatch" style="background:var(--low)"></i>Low band (woofer L+R)</span>
+    <span><i class="swatch" style="background:var(--high)"></i>High band (tweeter L+R)</span>
+    <span><i class="swatch" style="background:var(--pwr)"></i>24V power</span>
+    <span><i class="swatch" style="background:var(--pwr5)"></i>5V logic</span>
+    <span><i class="swatch dash" style="border-color:var(--gnd)"></i>Ground (star return)</span>
+  </div>
+
+  <h2>1 · Signal &amp; power block diagram</h2>
+  <div class="card">
+    <svg viewBox="0 0 900 620" role="img" aria-label="Signal chain block diagram">
+      <defs>
+        <marker id="arrLow" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+          <path d="M0,0 L7,3 L0,6 Z" fill="var(--low)"/>
+        </marker>
+        <marker id="arrHigh" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+          <path d="M0,0 L7,3 L0,6 Z" fill="var(--high)"/>
+        </marker>
+        <marker id="arrPwr" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+          <path d="M0,0 L7,3 L0,6 Z" fill="var(--pwr)"/>
+        </marker>
+        <marker id="arrPwr5" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+          <path d="M0,0 L7,3 L0,6 Z" fill="var(--pwr5)"/>
+        </marker>
+      </defs>
+
+      <!-- PSU -->
+      <rect x="30" y="20" width="150" height="60" rx="8" fill="var(--box-fill)" stroke="var(--pwr)" stroke-width="1.5"/>
+      <text x="105" y="45" text-anchor="middle" font-size="14" font-weight="700" fill="var(--ink)">24V / 150W PSU</text>
+      <text x="105" y="63" text-anchor="middle" font-size="11" fill="var(--muted)">6.25A max cont.</text>
+
+      <!-- Buck -->
+      <rect x="30" y="120" width="150" height="52" rx="8" fill="var(--box-fill)" stroke="var(--pwr5)" stroke-width="1.5"/>
+      <text x="105" y="141" text-anchor="middle" font-size="13" font-weight="700" fill="var(--ink)">Buck → 5V</text>
+      <text x="105" y="159" text-anchor="middle" font-size="11" fill="var(--muted)">logic rail</text>
+
+      <!-- 24V feed down to amps rail marker -->
+      <line x1="105" y1="80" x2="105" y2="120" stroke="var(--pwr)" stroke-width="2.5" marker-end="url(#arrPwr5)"/>
+      <text x="112" y="103" font-size="10" fill="var(--pwr)">24V</text>
+
+      <!-- ESP32 -->
+      <rect x="250" y="110" width="150" height="72" rx="8" fill="var(--box-fill)" stroke="var(--accent)" stroke-width="1.5"/>
+      <text x="325" y="135" text-anchor="middle" font-size="14" font-weight="700" fill="var(--ink)">ESP32-S3 Mini</text>
+      <text x="325" y="153" text-anchor="middle" font-size="11" fill="var(--muted)">crossover DSP</text>
+      <text x="325" y="170" text-anchor="middle" font-size="10" fill="var(--muted)">I2S0 · I2S1</text>
+
+      <!-- 5V to ESP32 -->
+      <line x1="180" y1="146" x2="250" y2="146" stroke="var(--pwr5)" stroke-width="2.5" marker-end="url(#arrPwr5)"/>
+      <text x="200" y="139" font-size="10" fill="var(--pwr5)">5V</text>
+
+      <!-- DAC LOW -->
+      <rect x="470" y="70" width="150" height="60" rx="8" fill="var(--box-fill)" stroke="var(--low)" stroke-width="1.6"/>
+      <text x="545" y="94" text-anchor="middle" font-size="13" font-weight="700" fill="var(--ink)">PCM5102 — LOW</text>
+      <text x="545" y="112" text-anchor="middle" font-size="11" fill="var(--muted)">OUTL / OUTR</text>
+
+      <!-- DAC HIGH -->
+      <rect x="470" y="162" width="150" height="60" rx="8" fill="var(--box-fill)" stroke="var(--high)" stroke-width="1.6"/>
+      <text x="545" y="186" text-anchor="middle" font-size="13" font-weight="700" fill="var(--ink)">PCM5102 — HIGH</text>
+      <text x="545" y="204" text-anchor="middle" font-size="11" fill="var(--muted)">OUTL / OUTR</text>
+
+      <!-- I2S0 low -->
+      <path d="M400 140 C 435 140, 435 100, 470 100" stroke="var(--low)" stroke-width="2.5" fill="none" marker-end="url(#arrLow)"/>
+      <text x="415" y="115" font-size="10" fill="var(--low)">I2S0</text>
+      <!-- I2S1 high -->
+      <path d="M400 158 C 435 158, 435 192, 470 192" stroke="var(--high)" stroke-width="2.5" fill="none" marker-end="url(#arrHigh)"/>
+      <text x="415" y="182" font-size="10" fill="var(--high)">I2S1</text>
+
+      <!-- 5V to both DACs -->
+      <line x1="180" y1="150" x2="180" y2="250" stroke="var(--pwr5)" stroke-width="2" fill="none"/>
+      <path d="M180 250 C 300 250, 340 100, 470 100" stroke="var(--pwr5)" stroke-width="1.8" fill="none" opacity="0.65" marker-end="url(#arrPwr5)"/>
+      <path d="M180 250 C 320 250, 350 192, 470 192" stroke="var(--pwr5)" stroke-width="1.8" fill="none" opacity="0.65" marker-end="url(#arrPwr5)"/>
+      <text x="230" y="262" font-size="10" fill="var(--pwr5)">5V → DAC VIN ×2</text>
+
+      <!-- Amps -->
+      <g>
+        <rect x="700" y="40" width="170" height="46" rx="7" fill="var(--box-fill)" stroke="var(--low)" stroke-width="1.4"/>
+        <text x="785" y="60" text-anchor="middle" font-size="12" font-weight="700" fill="var(--ink)">Amp 1 · TPA3118</text>
+        <text x="785" y="76" text-anchor="middle" font-size="10" fill="var(--muted)">L-Woofer</text>
+
+        <rect x="700" y="98" width="170" height="46" rx="7" fill="var(--box-fill)" stroke="var(--low)" stroke-width="1.4"/>
+        <text x="785" y="118" text-anchor="middle" font-size="12" font-weight="700" fill="var(--ink)">Amp 2 · TPA3118</text>
+        <text x="785" y="134" text-anchor="middle" font-size="10" fill="var(--muted)">R-Woofer</text>
+
+        <rect x="700" y="162" width="170" height="46" rx="7" fill="var(--box-fill)" stroke="var(--high)" stroke-width="1.4"/>
+        <text x="785" y="182" text-anchor="middle" font-size="12" font-weight="700" fill="var(--ink)">Amp 3 · TPA3118</text>
+        <text x="785" y="198" text-anchor="middle" font-size="10" fill="var(--muted)">L-Tweeter</text>
+
+        <rect x="700" y="220" width="170" height="46" rx="7" fill="var(--box-fill)" stroke="var(--high)" stroke-width="1.4"/>
+        <text x="785" y="240" text-anchor="middle" font-size="12" font-weight="700" fill="var(--ink)">Amp 4 · TPA3118</text>
+        <text x="785" y="256" text-anchor="middle" font-size="10" fill="var(--muted)">R-Tweeter</text>
+      </g>
+
+      <!-- DAC LOW outL/outR to amp1/amp2 -->
+      <path d="M620 90 C 660 90, 660 63, 700 63" stroke="var(--low)" stroke-width="2.2" fill="none" marker-end="url(#arrLow)"/>
+      <text x="632" y="72" font-size="9" fill="var(--low)">OUTL</text>
+      <path d="M620 110 C 660 110, 660 121, 700 121" stroke="var(--low)" stroke-width="2.2" fill="none" marker-end="url(#arrLow)"/>
+      <text x="632" y="128" font-size="9" fill="var(--low)">OUTR</text>
+
+      <!-- DAC HIGH outL/outR to amp3/amp4 -->
+      <path d="M620 182 C 660 182, 660 185, 700 185" stroke="var(--high)" stroke-width="2.2" fill="none" marker-end="url(#arrHigh)"/>
+      <text x="632" y="176" font-size="9" fill="var(--high)">OUTL</text>
+      <path d="M620 202 C 660 202, 660 243, 700 243" stroke="var(--high)" stroke-width="2.2" fill="none" marker-end="url(#arrHigh)"/>
+      <text x="632" y="220" font-size="9" fill="var(--high)">OUTR</text>
+
+      <!-- 24V power rail to all amps -->
+      <line x1="55" y1="80" x2="55" y2="330" stroke="var(--pwr)" stroke-width="2.8" fill="none"/>
+      <text x="60" y="325" font-size="10" fill="var(--pwr)">24V rail (fused 8A)</text>
+      <path d="M55 330 C 400 330, 500 63, 700 63"  stroke="var(--pwr)" stroke-width="1.6" fill="none" opacity="0.5"/>
+      <path d="M55 330 C 400 330, 500 121, 700 121" stroke="var(--pwr)" stroke-width="1.6" fill="none" opacity="0.5"/>
+      <path d="M55 330 C 400 330, 500 185, 700 185" stroke="var(--pwr)" stroke-width="1.6" fill="none" opacity="0.5"/>
+      <path d="M55 330 C 400 340, 500 243, 700 243" stroke="var(--pwr)" stroke-width="1.6" fill="none" opacity="0.5" marker-end="url(#arrPwr)"/>
+      <text x="360" y="352" font-size="10" fill="var(--pwr)">24V → 4× amp VIN (each branch fused ~3A)</text>
+
+      <!-- Speakers -->
+      <g fill="var(--muted)" font-size="11">
+        <text x="785" y="400" text-anchor="middle" font-size="12" font-weight="700" fill="var(--ink)">↓ BTL outputs → 4 drivers</text>
+        <text x="785" y="420" text-anchor="middle">L-Woofer   R-Woofer</text>
+        <text x="785" y="436" text-anchor="middle">L-Tweeter  R-Tweeter</text>
+      </g>
+      <line x1="785" y1="266" x2="785" y2="386" stroke="var(--line)" stroke-width="1.5" stroke-dasharray="2 3"/>
+
+      <!-- caption band -->
+      <text x="30" y="470" font-size="12" fill="var(--muted)">Band-split rationale: the noise-sensitive HIGH path never shares a converter or its</text>
+      <text x="30" y="488" font-size="12" fill="var(--muted)">analog ground with the high-current LOW path — the two only meet at the star ground.</text>
+    </svg>
+  </div>
+
+  <h2>1b · ESP32-S3 ↔ PCM5102 pin wiring</h2>
+  <p class="note">Exact pin-to-pin connections. Two independent I2S peripherals: <b>I2S0</b> (blue) drives the LOW DAC, <b>I2S1</b> (red) the HIGH DAC. No MCLK wire — each DAC's <code>SCK</code> is grounded so it runs on its internal PLL. GPIOs are the plan; verify against your specific board's silkscreen.</p>
+  <div class="card">
+    <svg viewBox="0 0 900 560" role="img" aria-label="ESP32-S3 to PCM5102 pin wiring">
+      <defs>
+        <marker id="wLow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="var(--low)"/></marker>
+        <marker id="wHigh" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="var(--high)"/></marker>
+        <marker id="w5" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="var(--pwr5)"/></marker>
+        <marker id="wG" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="var(--gnd)"/></marker>
+      </defs>
+
+      <!-- ESP32-S3 in the middle -->
+      <rect x="360" y="90" width="180" height="360" rx="10" fill="var(--box-fill)" stroke="var(--accent)" stroke-width="1.8"/>
+      <text x="450" y="116" text-anchor="middle" font-size="14" font-weight="700" fill="var(--ink)">ESP32-S3 Mini</text>
+
+      <!-- ESP32 pin labels (left side = LOW/I2S0, right side = HIGH/I2S1) -->
+      <g font-size="12" fill="var(--ink)">
+        <!-- left pins -->
+        <text x="372" y="160">GPIO4</text>
+        <text x="372" y="192">GPIO5</text>
+        <text x="372" y="224">GPIO6</text>
+        <!-- right pins -->
+        <text x="528" y="160" text-anchor="end">GPIO7</text>
+        <text x="528" y="192" text-anchor="end">GPIO8</text>
+        <text x="528" y="224" text-anchor="end">GPIO9</text>
+        <!-- power/gnd bottom -->
+        <text x="372" y="410">5V</text>
+        <text x="372" y="440">3V3</text>
+        <text x="528" y="410" text-anchor="end">GND</text>
+      </g>
+      <g font-size="9" fill="var(--muted)">
+        <text x="372" y="146">I2S0 BCK</text>
+        <text x="372" y="178">I2S0 WS</text>
+        <text x="372" y="210">I2S0 DOUT</text>
+        <text x="528" y="146" text-anchor="end">I2S1 BCK</text>
+        <text x="528" y="178" text-anchor="end">I2S1 WS</text>
+        <text x="528" y="210" text-anchor="end">I2S1 DOUT</text>
+      </g>
+
+      <!-- LOW DAC on the left -->
+      <rect x="40" y="120" width="200" height="220" rx="9" fill="var(--box-fill)" stroke="var(--low)" stroke-width="1.6"/>
+      <text x="140" y="144" text-anchor="middle" font-size="13" font-weight="700" fill="var(--ink)">PCM5102 — LOW</text>
+      <g font-size="11.5" fill="var(--ink)" text-anchor="end">
+        <text x="228" y="170">BCK</text>
+        <text x="228" y="196">LRCK / WS</text>
+        <text x="228" y="222">DIN</text>
+        <text x="228" y="256">VIN (5V)</text>
+        <text x="228" y="280">GND</text>
+      </g>
+      <!-- LOW straps -->
+      <g font-size="10" fill="var(--muted)">
+        <text x="52" y="306">SCK→GND · FMT→GND · FLT→GND</text>
+        <text x="52" y="322">DEMP→GND · XSMT→3V3 (un-mute)</text>
+      </g>
+
+      <!-- HIGH DAC on the right -->
+      <rect x="660" y="120" width="200" height="220" rx="9" fill="var(--box-fill)" stroke="var(--high)" stroke-width="1.6"/>
+      <text x="760" y="144" text-anchor="middle" font-size="13" font-weight="700" fill="var(--ink)">PCM5102 — HIGH</text>
+      <g font-size="11.5" fill="var(--ink)">
+        <text x="672" y="170">BCK</text>
+        <text x="672" y="196">LRCK / WS</text>
+        <text x="672" y="222">DIN</text>
+        <text x="672" y="256">VIN (5V)</text>
+        <text x="672" y="280">GND</text>
+      </g>
+      <g font-size="10" fill="var(--muted)">
+        <text x="672" y="306">SCK→GND · FMT→GND · FLT→GND</text>
+        <text x="672" y="322">DEMP→GND · XSMT→3V3 (un-mute)</text>
+      </g>
+
+      <!-- I2S0 wires ESP left -> LOW DAC -->
+      <g stroke="var(--low)" stroke-width="2" fill="none">
+        <path d="M368 156 C 300 156, 300 165, 240 165" marker-end="url(#wLow)"/>
+        <path d="M368 188 C 300 188, 300 191, 240 191" marker-end="url(#wLow)"/>
+        <path d="M368 220 C 300 220, 300 217, 240 217" marker-end="url(#wLow)"/>
+      </g>
+
+      <!-- I2S1 wires ESP right -> HIGH DAC -->
+      <g stroke="var(--high)" stroke-width="2" fill="none">
+        <path d="M532 156 C 600 156, 600 165, 660 165" marker-end="url(#wHigh)"/>
+        <path d="M532 188 C 600 188, 600 191, 660 191" marker-end="url(#wHigh)"/>
+        <path d="M532 220 C 600 220, 600 217, 660 217" marker-end="url(#wHigh)"/>
+      </g>
+
+      <!-- 5V from ESP to both DAC VIN -->
+      <g stroke="var(--pwr5)" stroke-width="1.8" fill="none">
+        <path d="M368 405 C 300 405, 300 251, 240 251" marker-end="url(#w5)"/>
+        <path d="M532 405 C 600 405, 600 251, 660 251" marker-end="url(#w5)"/>
+      </g>
+      <text x="450" y="470" text-anchor="middle" font-size="10" fill="var(--pwr5)">5V (from buck) → both DAC VIN &amp; the ESP 5V pin</text>
+
+      <!-- GND star note wires -->
+      <g stroke="var(--gnd)" stroke-width="1.8" stroke-dasharray="5 4" fill="none">
+        <path d="M240 275 C 300 275, 300 430, 528 405" marker-end="url(#wG)"/>
+        <path d="M660 275 C 600 275, 600 430, 532 405" marker-end="url(#wG)"/>
+      </g>
+      <text x="450" y="500" text-anchor="middle" font-size="10" fill="var(--gnd)">DAC GND + straps: home-run to the star point (§2), not chained ESP→DAC→DAC</text>
+
+      <text x="450" y="530" text-anchor="middle" font-size="11" fill="var(--muted)">DAC OUTL/OUTR/AGND (line out to the amps) are on the audio side — see §1 and §3.</text>
+    </svg>
+
+    <div class="legend" style="margin-top:14px">
+      <span><i class="swatch" style="background:var(--low)"></i>I2S0 → LOW DAC</span>
+      <span><i class="swatch" style="background:var(--high)"></i>I2S1 → HIGH DAC</span>
+      <span><i class="swatch" style="background:var(--pwr5)"></i>5V</span>
+      <span><i class="swatch dash" style="border-color:var(--gnd)"></i>GND (to star)</span>
+    </div>
+  </div>
+
+  <div class="card" style="overflow-x:auto">
+    <table style="border-collapse:collapse; width:100%; min-width:560px; font-size:0.9rem">
+      <thead>
+        <tr style="text-align:left; border-bottom:1px solid var(--box)">
+          <th style="padding:6px 10px">ESP32-S3 pin</th>
+          <th style="padding:6px 10px">Signal</th>
+          <th style="padding:6px 10px">→ PCM5102 LOW</th>
+          <th style="padding:6px 10px">→ PCM5102 HIGH</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="border-bottom:1px solid var(--box)"><td style="padding:6px 10px"><code>GPIO4</code></td><td style="padding:6px 10px">I2S0 BCK</td><td style="padding:6px 10px; color:var(--low)">BCK</td><td style="padding:6px 10px">—</td></tr>
+        <tr style="border-bottom:1px solid var(--box)"><td style="padding:6px 10px"><code>GPIO5</code></td><td style="padding:6px 10px">I2S0 WS/LRCK</td><td style="padding:6px 10px; color:var(--low)">LRCK</td><td style="padding:6px 10px">—</td></tr>
+        <tr style="border-bottom:1px solid var(--box)"><td style="padding:6px 10px"><code>GPIO6</code></td><td style="padding:6px 10px">I2S0 DOUT</td><td style="padding:6px 10px; color:var(--low)">DIN</td><td style="padding:6px 10px">—</td></tr>
+        <tr style="border-bottom:1px solid var(--box)"><td style="padding:6px 10px"><code>GPIO7</code></td><td style="padding:6px 10px">I2S1 BCK</td><td style="padding:6px 10px">—</td><td style="padding:6px 10px; color:var(--high)">BCK</td></tr>
+        <tr style="border-bottom:1px solid var(--box)"><td style="padding:6px 10px"><code>GPIO8</code></td><td style="padding:6px 10px">I2S1 WS/LRCK</td><td style="padding:6px 10px">—</td><td style="padding:6px 10px; color:var(--high)">LRCK</td></tr>
+        <tr style="border-bottom:1px solid var(--box)"><td style="padding:6px 10px"><code>GPIO9</code></td><td style="padding:6px 10px">I2S1 DOUT</td><td style="padding:6px 10px">—</td><td style="padding:6px 10px; color:var(--high)">DIN</td></tr>
+        <tr style="border-bottom:1px solid var(--box)"><td style="padding:6px 10px"><code>5V</code></td><td style="padding:6px 10px">supply</td><td style="padding:6px 10px">VIN</td><td style="padding:6px 10px">VIN</td></tr>
+        <tr style="border-bottom:1px solid var(--box)"><td style="padding:6px 10px"><code>3V3</code></td><td style="padding:6px 10px">un-mute</td><td style="padding:6px 10px">XSMT</td><td style="padding:6px 10px">XSMT</td></tr>
+        <tr><td style="padding:6px 10px"><code>GND</code></td><td style="padding:6px 10px">ground</td><td style="padding:6px 10px">GND + SCK/FMT/FLT/DEMP straps</td><td style="padding:6px 10px">GND + SCK/FMT/FLT/DEMP straps</td></tr>
+      </tbody>
+    </table>
+    <p class="note">Ground shown here as a logical connection — physically route each DAC's GND as its own home-run to the star point (§2), <b>not</b> daisy-chained through the ESP32.</p>
+  </div>
+
+  <h2>2 · Ground path — star topology</h2>
+  <p class="note">Every board's ground returns on its <b>own dedicated wire</b> to a single physical point: the PSU negative terminal. Nothing is daisy-chained. This is the whole reason the band-split helps — if grounds were chained, the class-D switching return current would ride through the DAC's analog reference anyway.</p>
+  <div class="card">
+    <svg viewBox="0 0 900 460" role="img" aria-label="Star ground topology">
+      <defs>
+        <marker id="gArr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L6,3 L0,6 Z" fill="var(--gnd)"/>
+        </marker>
+      </defs>
+
+      <!-- Star point -->
+      <circle cx="450" cy="230" r="14" fill="var(--gnd)"/>
+      <text x="450" y="235" text-anchor="middle" font-size="12" font-weight="700" fill="#fff">★</text>
+      <text x="450" y="272" text-anchor="middle" font-size="13" font-weight="700" fill="var(--gnd)">STAR POINT</text>
+      <text x="450" y="289" text-anchor="middle" font-size="11" fill="var(--muted)">PSU negative terminal</text>
+
+      <!-- nodes around it -->
+      <!-- ESP32 -->
+      <rect x="90" y="40" width="130" height="42" rx="7" fill="var(--box-fill)" stroke="var(--accent)" stroke-width="1.3"/>
+      <text x="155" y="66" text-anchor="middle" font-size="12" fill="var(--ink)">ESP32-S3 GND</text>
+      <!-- DAC LOW -->
+      <rect x="90" y="150" width="130" height="42" rx="7" fill="var(--box-fill)" stroke="var(--low)" stroke-width="1.3"/>
+      <text x="155" y="176" text-anchor="middle" font-size="12" fill="var(--ink)">DAC-LOW GND</text>
+      <!-- DAC HIGH -->
+      <rect x="90" y="260" width="130" height="42" rx="7" fill="var(--box-fill)" stroke="var(--high)" stroke-width="1.3"/>
+      <text x="155" y="286" text-anchor="middle" font-size="12" fill="var(--ink)">DAC-HIGH GND</text>
+      <!-- Buck/PSU 5V -->
+      <rect x="90" y="360" width="130" height="42" rx="7" fill="var(--box-fill)" stroke="var(--pwr5)" stroke-width="1.3"/>
+      <text x="155" y="386" text-anchor="middle" font-size="12" fill="var(--ink)">5V buck GND</text>
+
+      <!-- Amps on right -->
+      <rect x="680" y="40" width="130" height="42" rx="7" fill="var(--box-fill)" stroke="var(--low)" stroke-width="1.3"/>
+      <text x="745" y="66" text-anchor="middle" font-size="12" fill="var(--ink)">Amp 1 PGND</text>
+      <rect x="680" y="150" width="130" height="42" rx="7" fill="var(--box-fill)" stroke="var(--low)" stroke-width="1.3"/>
+      <text x="745" y="176" text-anchor="middle" font-size="12" fill="var(--ink)">Amp 2 PGND</text>
+      <rect x="680" y="260" width="130" height="42" rx="7" fill="var(--box-fill)" stroke="var(--high)" stroke-width="1.3"/>
+      <text x="745" y="286" text-anchor="middle" font-size="12" fill="var(--ink)">Amp 3 PGND</text>
+      <rect x="680" y="360" width="130" height="42" rx="7" fill="var(--box-fill)" stroke="var(--high)" stroke-width="1.3"/>
+      <text x="745" y="386" text-anchor="middle" font-size="12" fill="var(--ink)">Amp 4 PGND</text>
+
+      <!-- home-run ground wires (dashed green) -->
+      <g stroke="var(--gnd)" stroke-width="2" stroke-dasharray="6 4" fill="none">
+        <path d="M220 61  C 340 61, 360 210, 437 224" marker-end="url(#gArr)"/>
+        <path d="M220 171 C 320 171, 380 210, 436 226" marker-end="url(#gArr)"/>
+        <path d="M220 281 C 320 281, 380 250, 436 234" marker-end="url(#gArr)"/>
+        <path d="M220 381 C 340 381, 360 250, 437 236" marker-end="url(#gArr)"/>
+        <path d="M680 61  C 560 61, 540 210, 463 224" marker-end="url(#gArr)"/>
+        <path d="M680 171 C 580 171, 520 210, 464 226" marker-end="url(#gArr)"/>
+        <path d="M680 281 C 580 281, 520 250, 464 234" marker-end="url(#gArr)"/>
+        <path d="M680 381 C 560 381, 540 250, 463 236" marker-end="url(#gArr)"/>
+      </g>
+
+      <text x="450" y="430" text-anchor="middle" font-size="12" fill="var(--muted)">7 signal/logic + amp home-run returns, all meeting once. No board's GND passes through another's.</text>
+    </svg>
+  </div>
+
+  <h2>3 · Analog signal ground (rides with the audio)</h2>
+  <p class="note">Separate from the power-star above: each PCM5102's <b>analog</b> ground travels alongside its OUTL/OUTR wires to the amp input's signal ground, ideally twisted-pair per channel. This signal reference and the power-ground star meet <b>only once</b>, at the star point — so switching-current loops and audio-reference loops never overlap.</p>
+  <ul class="note">
+    <li>Twisted pair: <code>OUTL + AGND</code> and <code>OUTR + AGND</code> from each DAC to its two amps.</li>
+    <li>Keep I2S clock/data (BCK/WS/DOUT) runs short and away from the 24V amp wiring.</li>
+    <li>Physically separate the high-current 24V harness from all analog/I2S wiring — cross at right angles if they must cross.</li>
+  </ul>
+
+  <h2>4 · Physical layout &amp; mute transistors</h2>
+  <p class="note">As-built floorplan: DACs + ESP32 across the top, the 4 mute transistors (T1–T4) in a row below, and the <b>power distribution on an elevated tier above</b> (its own board, standoffs over this one — keeps the 24V high-current wiring physically off the signal layer). Each amp's 2-pin "mute" jumper header is emulated by one NPN, and <b>each NPN has its own GPIO</b> (GPIO10–13, contiguous, not strapping/USB/PSRAM pins) so channels can be muted individually during bring-up; firmware gangs them for the global mute.</p>
+  <div class="card">
+    <svg viewBox="0 0 900 640" role="img" aria-label="Physical layout with mute transistors">
+      <defs>
+        <marker id="lArrLow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="var(--low)"/></marker>
+        <marker id="lArrHigh" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="var(--high)"/></marker>
+        <marker id="lArrMute" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="var(--accent)"/></marker>
+        <marker id="lArrPwr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="var(--pwr)"/></marker>
+      </defs>
+
+      <!-- Elevated power tier (drawn as a raised platform) -->
+      <polygon points="150,26 800,26 770,64 120,64" fill="var(--box-fill)" stroke="var(--pwr)" stroke-width="1.6"/>
+      <text x="455" y="52" text-anchor="middle" font-size="13" font-weight="700" fill="var(--pwr)">⬆ POWER TIER (elevated board on standoffs)</text>
+      <text x="455" y="82" text-anchor="middle" font-size="11" fill="var(--muted)">24V/150W PSU · buck → 5V · main+branch fuses · star ground point</text>
+      <!-- standoff posts -->
+      <g stroke="var(--pwr)" stroke-width="1.4" stroke-dasharray="3 3">
+        <line x1="150" y1="64" x2="150" y2="150"/>
+        <line x1="770" y1="64" x2="770" y2="150"/>
+      </g>
+      <text x="176" y="120" font-size="9" fill="var(--muted)">standoff</text>
+      <!-- 24V + 5V feeds coming down to the lower board -->
+      <line x1="150" y1="90" x2="150" y2="150" stroke="var(--pwr)" stroke-width="2.4" marker-end="url(#lArrPwr)"/>
+      <text x="60" y="112" font-size="9" fill="var(--pwr)">24V→amps</text>
+      <text x="700" y="120" font-size="9" fill="var(--pwr5)">5V→logic</text>
+      <line x1="770" y1="90" x2="770" y2="150" stroke="var(--pwr5)" stroke-width="2.2"/>
+
+      <!-- Lower board outline -->
+      <rect x="70" y="150" width="770" height="430" rx="12" fill="none" stroke="var(--box)" stroke-width="1.4" stroke-dasharray="4 4"/>
+      <text x="84" y="170" font-size="10" fill="var(--muted)">LOWER TIER — logic / DAC board</text>
+
+      <!-- Top row: PCM1 | ESP32 | PCM2 -->
+      <rect x="110" y="188" width="170" height="70" rx="8" fill="var(--box-fill)" stroke="var(--low)" stroke-width="1.6"/>
+      <text x="195" y="216" text-anchor="middle" font-size="13" font-weight="700" fill="var(--ink)">PCM 1 — LOW</text>
+      <text x="195" y="236" text-anchor="middle" font-size="10" fill="var(--muted)">woofers L+R</text>
+
+      <rect x="360" y="180" width="180" height="90" rx="8" fill="var(--box-fill)" stroke="var(--accent)" stroke-width="1.8"/>
+      <text x="450" y="212" text-anchor="middle" font-size="14" font-weight="700" fill="var(--ink)">ESP32-S3</text>
+      <text x="450" y="232" text-anchor="middle" font-size="10" fill="var(--muted)">crossover DSP</text>
+      <text x="450" y="252" text-anchor="middle" font-size="10" fill="var(--accent)">GPIO10 · 11 · 12 · 13 = MUTE1–4</text>
+
+      <rect x="620" y="188" width="170" height="70" rx="8" fill="var(--box-fill)" stroke="var(--high)" stroke-width="1.6"/>
+      <text x="705" y="216" text-anchor="middle" font-size="13" font-weight="700" fill="var(--ink)">PCM 2 — HIGH</text>
+      <text x="705" y="236" text-anchor="middle" font-size="10" fill="var(--muted)">tweeters L+R</text>
+
+      <!-- I2S links (short, matching §1b) -->
+      <path d="M360 225 C 330 225, 320 223, 280 223" stroke="var(--low)" stroke-width="1.8" fill="none" marker-end="url(#lArrLow)"/>
+      <text x="300" y="215" font-size="9" fill="var(--low)">I2S0</text>
+      <path d="M540 225 C 570 225, 580 223, 620 223" stroke="var(--high)" stroke-width="1.8" fill="none" marker-end="url(#lArrHigh)"/>
+      <text x="574" y="215" font-size="9" fill="var(--high)">I2S1</text>
+
+      <!-- One mute line per transistor: GPIO10..13 leave the ESP32 bottom edge and fan out -->
+      <g stroke="var(--accent)" stroke-width="1.8" fill="none">
+        <path d="M400 270 V292 H175"/>
+        <path d="M433 270 V304 H345"/>
+        <path d="M467 270 V304 H555"/>
+        <path d="M500 270 V292 H725"/>
+      </g>
+      <g font-size="8.5" fill="var(--accent)">
+        <text x="396" y="284" text-anchor="end">10</text>
+        <text x="429" y="298" text-anchor="end">11</text>
+        <text x="471" y="298">12</text>
+        <text x="504" y="284">13</text>
+      </g>
+
+      <!-- Transistors T1..T4 -->
+      <g font-size="12">
+        <!-- T1 -->
+        <rect x="120" y="340" width="110" height="72" rx="8" fill="var(--box-fill)" stroke="var(--low)" stroke-width="1.5"/>
+        <text x="175" y="366" text-anchor="middle" font-weight="700" fill="var(--ink)">T1</text>
+        <text x="175" y="384" text-anchor="middle" font-size="9.5" fill="var(--muted)">NPN · BC547</text>
+        <text x="175" y="400" text-anchor="middle" font-size="9.5" fill="var(--muted)">→ Amp1 mute</text>
+        <!-- T2 -->
+        <rect x="290" y="340" width="110" height="72" rx="8" fill="var(--box-fill)" stroke="var(--low)" stroke-width="1.5"/>
+        <text x="345" y="366" text-anchor="middle" font-weight="700" fill="var(--ink)">T2</text>
+        <text x="345" y="384" text-anchor="middle" font-size="9.5" fill="var(--muted)">NPN · BC547</text>
+        <text x="345" y="400" text-anchor="middle" font-size="9.5" fill="var(--muted)">→ Amp2 mute</text>
+        <!-- T3 -->
+        <rect x="500" y="340" width="110" height="72" rx="8" fill="var(--box-fill)" stroke="var(--high)" stroke-width="1.5"/>
+        <text x="555" y="366" text-anchor="middle" font-weight="700" fill="var(--ink)">T3</text>
+        <text x="555" y="384" text-anchor="middle" font-size="9.5" fill="var(--muted)">NPN · BC547</text>
+        <text x="555" y="400" text-anchor="middle" font-size="9.5" fill="var(--muted)">→ Amp3 mute</text>
+        <!-- T4 -->
+        <rect x="670" y="340" width="110" height="72" rx="8" fill="var(--box-fill)" stroke="var(--high)" stroke-width="1.5"/>
+        <text x="725" y="366" text-anchor="middle" font-weight="700" fill="var(--ink)">T4</text>
+        <text x="725" y="384" text-anchor="middle" font-size="9.5" fill="var(--muted)">NPN · BC547</text>
+        <text x="725" y="400" text-anchor="middle" font-size="9.5" fill="var(--muted)">→ Amp4 mute</text>
+      </g>
+
+      <!-- base drops from mute rail to each transistor via 1k -->
+      <g stroke="var(--accent)" stroke-width="1.8" fill="none">
+        <line x1="175" y1="292" x2="175" y2="340" marker-end="url(#lArrMute)"/>
+        <line x1="345" y1="304" x2="345" y2="340" marker-end="url(#lArrMute)"/>
+        <line x1="555" y1="304" x2="555" y2="340" marker-end="url(#lArrMute)"/>
+        <line x1="725" y1="292" x2="725" y2="340" marker-end="url(#lArrMute)"/>
+      </g>
+      <g font-size="8.5" fill="var(--accent)">
+        <text x="170" y="326" text-anchor="end">GPIO10 · 1k→B</text>
+        <text x="340" y="326" text-anchor="end">GPIO11 · 1k→B</text>
+        <text x="560" y="326">GPIO12 · 1k→B</text>
+        <text x="730" y="326">GPIO13 · 1k→B</text>
+      </g>
+
+      <!-- collector out to amp mute headers (up on power tier / to amp boards) -->
+      <g stroke="var(--line)" stroke-width="1.6" fill="none" stroke-dasharray="2 3">
+        <line x1="175" y1="412" x2="175" y2="470"/>
+        <line x1="345" y1="412" x2="345" y2="470"/>
+        <line x1="555" y1="412" x2="555" y2="470"/>
+        <line x1="725" y1="412" x2="725" y2="470"/>
+      </g>
+      <text x="450" y="492" text-anchor="middle" font-size="11" fill="var(--muted)">Each collector → its amp's 2-pin MUTE header pin A · each emitter → GND (star)</text>
+
+      <!-- Detail inset: one NPN -->
+      <rect x="300" y="512" width="300" height="110" rx="8" fill="var(--box-fill)" stroke="var(--box)" stroke-width="1.2"/>
+      <text x="450" y="532" text-anchor="middle" font-size="11" font-weight="700" fill="var(--ink)">One channel (NPN detail)</text>
+      <!-- transistor symbol-ish -->
+      <text x="330" y="566" font-size="10" fill="var(--accent)">GPIOn</text>
+      <line x1="360" y1="562" x2="410" y2="562" stroke="var(--accent)" stroke-width="1.6"/>
+      <rect x="410" y="556" width="26" height="12" fill="none" stroke="var(--muted)" stroke-width="1"/>
+      <text x="423" y="552" text-anchor="middle" font-size="8" fill="var(--muted)">1k</text>
+      <line x1="436" y1="562" x2="470" y2="562" stroke="var(--accent)" stroke-width="1.6"/>
+      <circle cx="482" cy="562" r="13" fill="none" stroke="var(--ink)" stroke-width="1.3"/>
+      <text x="482" y="566" text-anchor="middle" font-size="9" fill="var(--ink)">Q</text>
+      <line x1="482" y1="549" x2="482" y2="540" stroke="var(--line)" stroke-width="1.6"/>
+      <text x="500" y="540" font-size="9" fill="var(--line)">C → mute pin A</text>
+      <line x1="482" y1="575" x2="482" y2="590" stroke="var(--gnd)" stroke-width="1.6"/>
+      <text x="500" y="592" font-size="9" fill="var(--gnd)">E → GND pin B</text>
+      <text x="315" y="605" font-size="9" fill="var(--muted)">GPIO high → Q saturates → shorts the header (= jumper in). Set firmware polarity from your test.</text>
+      <text x="315" y="617" font-size="9" fill="var(--muted)">10k base→GND pull-down: floating GPIO at reset = Q off = header open.</text>
+    </svg>
+
+    <div class="legend" style="margin-top:14px">
+      <span><i class="swatch" style="background:var(--accent)"></i>Mute lines (GPIO10–13, one per NPN)</span>
+      <span><i class="swatch" style="background:var(--pwr)"></i>24V (from power tier)</span>
+      <span><i class="swatch" style="background:var(--pwr5)"></i>5V</span>
+      <span><i class="swatch dash" style="border-color:var(--line)"></i>to amp mute header</span>
+    </div>
+    <p class="note"><b>Fail-safe:</b> wire so a floating/low GPIO at boot = <b>muted</b>; firmware un-mutes only after I2S is streaming and the PCM5102 <code>XSMT</code> is high. On shutdown, mute (GPIOs first) before stopping I2S. The 10k pull-down makes "floating = header open"; if the bench test shows <i>shorted</i> = mute, swap it for a 10k pull-<b>up</b> to 3V3 so floating = header shorted = muted.</p>
+  </div>
+
+  <h2>4b · Mute transistor pin assignment</h2>
+  <div class="card" style="overflow-x:auto">
+    <table style="border-collapse:collapse; width:100%; min-width:640px; font-size:0.9rem">
+      <thead>
+        <tr style="text-align:left; border-bottom:1px solid var(--box)">
+          <th style="padding:6px 10px">NPN</th>
+          <th style="padding:6px 10px">ESP32-S3 GPIO</th>
+          <th style="padding:6px 10px">Base</th>
+          <th style="padding:6px 10px">Collector →</th>
+          <th style="padding:6px 10px">Emitter →</th>
+          <th style="padding:6px 10px">Amp / driver</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="border-bottom:1px solid var(--box)"><td style="padding:6px 10px"><b>T1</b></td><td style="padding:6px 10px"><code>GPIO10</code></td><td style="padding:6px 10px">1k series + 10k to GND</td><td style="padding:6px 10px">Amp 1 MUTE header pin A</td><td style="padding:6px 10px">header pin B / star GND</td><td style="padding:6px 10px; color:var(--low)">Amp 1 · L-Woofer</td></tr>
+        <tr style="border-bottom:1px solid var(--box)"><td style="padding:6px 10px"><b>T2</b></td><td style="padding:6px 10px"><code>GPIO11</code></td><td style="padding:6px 10px">1k series + 10k to GND</td><td style="padding:6px 10px">Amp 2 MUTE header pin A</td><td style="padding:6px 10px">header pin B / star GND</td><td style="padding:6px 10px; color:var(--low)">Amp 2 · R-Woofer</td></tr>
+        <tr style="border-bottom:1px solid var(--box)"><td style="padding:6px 10px"><b>T3</b></td><td style="padding:6px 10px"><code>GPIO12</code></td><td style="padding:6px 10px">1k series + 10k to GND</td><td style="padding:6px 10px">Amp 3 MUTE header pin A</td><td style="padding:6px 10px">header pin B / star GND</td><td style="padding:6px 10px; color:var(--high)">Amp 3 · L-Tweeter</td></tr>
+        <tr><td style="padding:6px 10px"><b>T4</b></td><td style="padding:6px 10px"><code>GPIO13</code></td><td style="padding:6px 10px">1k series + 10k to GND</td><td style="padding:6px 10px">Amp 4 MUTE header pin A</td><td style="padding:6px 10px">header pin B / star GND</td><td style="padding:6px 10px; color:var(--high)">Amp 4 · R-Tweeter</td></tr>
+      </tbody>
+    </table>
+    <ul class="note">
+      <li><b>Header pin A vs B:</b> meter the 2-pin header with the amp powered — the pin at ~0 V is B (GND, emitter side); the other is A (control, collector side). Measure each board; don't assume the silkscreen orientation matches across the four.</li>
+      <li><b>Transistor legs, TO-92 flat face toward you, legs down:</b> <b>BC547 = C · B · E</b> (left→right). <b>2N3904 / 2N2222A (TO-92) = E · B · C</b> — the reverse. Swapping C and E leaves the NPN in reverse-active mode with tiny gain; it will not pull the header low reliably.</li>
+      <li><b>Why GPIO10–13:</b> outside the I2S set (4–9), not strapping (0/3/45/46), not native USB (19/20, in use for UAC), not octal-PSRAM (35–37). They are the FSPI (SPI2) pins, which nothing else on this board uses. All four are broken out on the common S3 Mini / Super Mini clones — check the silkscreen once.</li>
+      <li><b>Firmware:</b> <code>PIN_MUTE = 10</code> becomes <code>PIN_MUTE[4] = {10, 11, 12, 13}</code> and <code>setAmpsMuted()</code> writes all four. Not yet changed — see WIRING.md.</li>
+    </ul>
+  </div>
+
+  <h2>Power budget reminder</h2>
+  <p class="note">150W ÷ 24V = <b>6.25A continuous</b>. 4 amps × 60W = 240W = 10A if all peaked together — over budget. Fine for music (crest factor), <b>not</b> for simultaneous full-power test tones on all 4 channels. Main fuse 8A slow-blow catches faults, not routine headroom.</p>
+</div>

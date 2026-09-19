@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows10.0.19041.0</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <!-- WinForms only for NotifyIcon (the tray); its implicit usings are removed
+         below so Application/MessageBox/OpenFileDialog stay the WPF ones. -->
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>SpeakerDspDeck</AssemblyName>
+    <RootNamespace>SpeakerDspDeck</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>dsp.ico</ApplicationIcon>
+    <!-- single-file publish: dotnet publish -r win-x64 -p:PublishSingleFile=true (self-contained) -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
+
+</Project>
