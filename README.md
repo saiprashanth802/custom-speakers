@@ -17,7 +17,7 @@ v2 splits into two physical units, and this repo mirrors that:
   two drivers on an NL4 socket. Contains the enclosure conversion plan
   (3-way → 2-way) and the driver data.
 - **[`amp/`](amp/)** — the DSP/amp unit: ESP32-S3 crossover firmware, two
-  PCM5102 DACs, four TPA3118 amps, 150 W AC-DC supply, in its own enclosure.
+  PCM5102 DACs, four TPA3118 amps, 24 V open-frame AC-DC supply, in its own enclosure.
   Firmware, Windows companion app, BLE protocol, wiring and DSP design docs.
   Imported from the former `speaker-dsp-crossover` repository with its history.
 - **[`v1-passive-bookshelf/`](v1-passive-bookshelf/)** — the 2024 build,

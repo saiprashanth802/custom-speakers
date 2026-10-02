@@ -14,6 +14,11 @@
     --box: #cfcfcf;
     --box-fill: #fbfbfa;
     --accent: #7c3aed;
+    --ac-l: #8b4513;     /* mains line (brown) */
+    --ac-n: #1d4ed8;     /* mains neutral (blue) */
+    --pe-g: #15803d;     /* protective earth (green/yellow) */
+    --pe-y: #eab308;
+    --hv-tint: #fdf0ee;  /* 230 V AC zone */
   }
   :root:not([data-theme="light"]) {
     @media (prefers-color-scheme: dark) {
@@ -30,6 +35,11 @@
       --box: #3a3c42;
       --box-fill: #26282d;
       --accent: #a78bfa;
+      --ac-l: #d08b5b;
+      --ac-n: #60a5fa;
+      --pe-g: #4ade80;
+      --pe-y: #facc15;
+      --hv-tint: #2e2023;
     }
   }
   :root[data-theme="dark"] {
@@ -46,6 +56,11 @@
     --box: #3a3c42;
     --box-fill: #26282d;
     --accent: #a78bfa;
+    --ac-l: #d08b5b;
+    --ac-n: #60a5fa;
+    --pe-g: #4ade80;
+    --pe-y: #facc15;
+    --hv-tint: #2e2023;
   }
   * { box-sizing: border-box; }
   body {
@@ -80,7 +95,7 @@
 
 <div class="wrap">
   <h1>Active Crossover — Schematic &amp; Ground Path</h1>
-  <p class="sub">ESP32-S3 DSP · 2× PCM5102 (band-split) · 4× TPA3118 mono · 24V/150W · 2-way stereo</p>
+  <p class="sub">ESP32-S3 DSP · 2× PCM5102 (band-split) · 4× TPA3118 mono · 24V/140W open-frame PSU · 2-way stereo</p>
 
   <div class="legend">
     <span><i class="swatch" style="background:var(--low)"></i>Low band (woofer L+R)</span>
@@ -110,8 +125,8 @@
 
       <!-- PSU -->
       <rect x="30" y="20" width="150" height="60" rx="8" fill="var(--box-fill)" stroke="var(--pwr)" stroke-width="1.5"/>
-      <text x="105" y="45" text-anchor="middle" font-size="14" font-weight="700" fill="var(--ink)">24V / 150W PSU</text>
-      <text x="105" y="63" text-anchor="middle" font-size="11" fill="var(--muted)">6.25A max cont.</text>
+      <text x="105" y="45" text-anchor="middle" font-size="14" font-weight="700" fill="var(--ink)">24V / 140W PSU</text>
+      <text x="105" y="63" text-anchor="middle" font-size="11" fill="var(--muted)">5.5A nom · 6A peak</text>
 
       <!-- Buck -->
       <rect x="30" y="120" width="150" height="52" rx="8" fill="var(--box-fill)" stroke="var(--pwr5)" stroke-width="1.5"/>
@@ -421,7 +436,7 @@
       <!-- Elevated power tier (drawn as a raised platform) -->
       <polygon points="150,26 800,26 770,64 120,64" fill="var(--box-fill)" stroke="var(--pwr)" stroke-width="1.6"/>
       <text x="455" y="52" text-anchor="middle" font-size="13" font-weight="700" fill="var(--pwr)">⬆ POWER TIER (elevated board on standoffs)</text>
-      <text x="455" y="82" text-anchor="middle" font-size="11" fill="var(--muted)">24V/150W PSU · buck → 5V · main+branch fuses · star ground point</text>
+      <text x="455" y="82" text-anchor="middle" font-size="11" fill="var(--muted)">24V/140W PSU · buck → 5V · main+branch fuses · star ground point</text>
       <!-- standoff posts -->
       <g stroke="var(--pwr)" stroke-width="1.4" stroke-dasharray="3 3">
         <line x1="150" y1="64" x2="150" y2="150"/>
@@ -575,6 +590,373 @@
     </ul>
   </div>
 
+  <h2 id="mains">5 · Mains input: C13 cord → C14 inlet → fuse → switch → PSU</h2>
+  <p class="note">The AC side of the box. Drawn 2026-10-02 and <b>not built yet</b>. J1, F1 and S1 are a single part, already owned: an Electronic Spices <b>AC-01A</b> three-in-one module (C14 inlet, 5×20 fuse drawer, illuminated DPST rocker). Rear-tab wiring is in §5b. The wall plug's L/N positions follow the usual convention only, because the cord and the wall socket, not the inlet, decide which wire is live.</p>
+  <div class="card">
+    <svg viewBox="0 0 900 500" role="img" aria-label="Mains input wiring: Indian 3-pin plug, C13 cord, C14 panel inlet, fuse F1, DPST switch S1, PSU, earth wire straight from inlet to PSU">
+      <!-- 230 V zone -->
+      <rect x="340" y="112" width="405" height="318" rx="10" fill="var(--hv-tint)" stroke="var(--pwr)" stroke-width="1" stroke-dasharray="5 4"/>
+      <text x="352" y="130" font-size="11" font-weight="700" fill="var(--pwr)">230 V AC ZONE</text>
+      <rect x="300" y="138" width="348" height="180" rx="8" fill="none" stroke="var(--accent)" stroke-width="1.4" stroke-dasharray="7 4"/>
+      <text x="436" y="334" font-size="10" font-weight="700" fill="var(--accent)">AC-01A module = J1 + F1 + S1</text>
+
+      <!-- outside / inside -->
+      <text x="318" y="78" text-anchor="end" font-size="11" fill="var(--muted)">outside</text>
+      <text x="342" y="78" font-size="11" fill="var(--muted)">inside the amp box</text>
+
+      <!-- rear panel -->
+      <line x1="330" y1="88" x2="330" y2="470" stroke="var(--line)" stroke-width="6"/>
+      <text transform="translate(322,462) rotate(-90)" font-size="10" letter-spacing="2" fill="var(--muted)">REAR PANEL</text>
+
+      <!-- wall plug, pin face -->
+      <rect x="30" y="150" width="96" height="112" rx="16" fill="var(--box-fill)" stroke="var(--line)" stroke-width="1.4"/>
+      <circle cx="78" cy="182" r="9" fill="var(--pe-g)"/>
+      <circle cx="58" cy="230" r="6" fill="var(--ac-l)"/>
+      <circle cx="98" cy="230" r="6" fill="var(--ac-n)"/>
+      <text x="92" y="186" font-size="11" font-weight="700" fill="var(--pe-g)">E</text>
+      <text x="58" y="253" text-anchor="middle" font-size="11" font-weight="700" fill="var(--ac-l)">L</text>
+      <text x="98" y="253" text-anchor="middle" font-size="11" font-weight="700" fill="var(--ac-n)">N</text>
+      <text x="24" y="284" font-size="12" font-weight="700" fill="var(--ink)">Indian 3-pin plug</text>
+      <text x="24" y="299" font-size="10" fill="var(--muted)">6 A · pin face, earth up</text>
+      <text x="24" y="313" font-size="10" fill="var(--muted)">L/N by convention only:</text>
+      <text x="24" y="326" font-size="10" fill="var(--muted)">check the wall with a tester</text>
+
+      <!-- cord -->
+      <path d="M126 206 C 170 206, 200 205, 240 205" stroke="var(--muted)" stroke-width="10" stroke-linecap="round" fill="none" opacity="0.55"/>
+      <text x="183" y="232" text-anchor="middle" font-size="10" fill="var(--muted)">IEC power cord</text>
+
+      <!-- C13 (cord end) -->
+      <rect x="240" y="172" width="58" height="68" rx="6" fill="var(--box-fill)" stroke="var(--line)" stroke-width="1.4"/>
+      <text x="269" y="200" text-anchor="middle" font-size="13" font-weight="700" fill="var(--ink)">C13</text>
+      <text x="269" y="215" text-anchor="middle" font-size="10" fill="var(--muted)">cord end</text>
+      <text x="269" y="228" text-anchor="middle" font-size="10" fill="var(--muted)">female</text>
+
+      <!-- C14 (panel inlet) -->
+      <rect x="302" y="160" width="58" height="150" rx="5" fill="var(--box-fill)" stroke="var(--line)" stroke-width="1.6"/>
+      <rect x="360" y="175" width="16" height="10" rx="2" fill="var(--line)"/>
+      <rect x="360" y="215" width="16" height="10" rx="2" fill="var(--line)"/>
+      <rect x="360" y="275" width="16" height="10" rx="2" fill="var(--line)"/>
+      <text x="346" y="184" text-anchor="middle" font-size="11" font-weight="700" fill="var(--ac-l)">L</text>
+      <text x="346" y="224" text-anchor="middle" font-size="11" font-weight="700" fill="var(--ac-n)">N</text>
+      <text x="346" y="284" text-anchor="middle" font-size="11" font-weight="700" fill="var(--pe-g)">⏚</text>
+      <text x="318" y="330" text-anchor="end" font-size="12" font-weight="700" fill="var(--ink)">C14 inlet</text>
+      <text x="318" y="343" text-anchor="end" font-size="10" fill="var(--muted)">male · J1</text>
+
+      <!-- L: inlet → F1 → S1 → PSU -->
+      <path d="M376 180 H440" stroke="var(--ac-l)" stroke-width="3" fill="none"/>
+      <rect x="440" y="171" width="80" height="18" rx="4" fill="var(--box-fill)" stroke="var(--ink)" stroke-width="1.4"/>
+      <line x1="446" y1="180" x2="514" y2="180" stroke="var(--ink)" stroke-width="1.2"/>
+      <text x="480" y="162" text-anchor="middle" font-size="12" font-weight="700" fill="var(--ink)">F1 · T3.15 A</text>
+      <text x="480" y="204" text-anchor="middle" font-size="10" fill="var(--muted)">5×20 mm slow-blow, 250 V</text>
+      <path d="M520 180 H580" stroke="var(--ac-l)" stroke-width="3" fill="none"/>
+      <path d="M632 180 H720" stroke="var(--ac-l)" stroke-width="3" fill="none"/>
+
+      <!-- N: inlet → S1 → PSU -->
+      <path d="M376 220 H580" stroke="var(--ac-n)" stroke-width="3" fill="none"/>
+      <path d="M632 220 H720" stroke="var(--ac-n)" stroke-width="3" fill="none"/>
+
+      <!-- S1 DPST, drawn off -->
+      <circle cx="580" cy="180" r="3.5" fill="var(--ink)"/>
+      <circle cx="632" cy="180" r="3.5" fill="var(--panel)" stroke="var(--ink)" stroke-width="1.5"/>
+      <line x1="580" y1="180" x2="626" y2="164" stroke="var(--ink)" stroke-width="2"/>
+      <circle cx="580" cy="220" r="3.5" fill="var(--ink)"/>
+      <circle cx="632" cy="220" r="3.5" fill="var(--panel)" stroke="var(--ink)" stroke-width="1.5"/>
+      <line x1="580" y1="220" x2="626" y2="204" stroke="var(--ink)" stroke-width="2"/>
+      <line x1="603" y1="172" x2="603" y2="212" stroke="var(--muted)" stroke-width="1.3" stroke-dasharray="3 3"/>
+      <text x="606" y="150" text-anchor="middle" font-size="12" font-weight="700" fill="var(--ink)">S1 · DPST</text>
+      <text x="606" y="244" text-anchor="middle" font-size="10" fill="var(--muted)">rocker, breaks L and N</text>
+      <text x="606" y="257" text-anchor="middle" font-size="10" fill="var(--muted)">illuminated, 4 tabs</text>
+
+      <!-- PSU -->
+      <rect x="720" y="140" width="150" height="232" rx="8" fill="var(--box-fill)" stroke="var(--pwr)" stroke-width="1.6"/>
+      <text x="808" y="166" text-anchor="middle" font-size="13" font-weight="700" fill="var(--ink)">WX-DC2416</text>
+      <text x="808" y="182" text-anchor="middle" font-size="11" fill="var(--muted)">24 V · 5.5 A</text>
+      <circle cx="720" cy="180" r="4" fill="var(--ac-l)"/>
+      <circle cx="720" cy="220" r="4" fill="var(--ac-n)"/>
+      <circle cx="720" cy="300" r="4" fill="var(--pe-g)"/>
+      <text x="732" y="184" font-size="11" font-weight="700" fill="var(--ac-l)">L</text>
+      <text x="732" y="224" font-size="11" font-weight="700" fill="var(--ac-n)">N</text>
+      <text x="732" y="304" font-size="11" font-weight="700" fill="var(--pe-g)">⏚ hole</text>
+      <text x="808" y="250" text-anchor="middle" font-size="10" fill="var(--muted)">open frame</text>
+      <text x="808" y="263" text-anchor="middle" font-size="10" fill="var(--muted)">85–265 V, no selector</text>
+      <text x="770" y="362" text-anchor="middle" font-size="11" font-weight="700" fill="var(--gnd)">−V</text>
+      <text x="840" y="362" text-anchor="middle" font-size="11" font-weight="700" fill="var(--pwr)">+V</text>
+
+      <!-- DC out -->
+      <path d="M840 372 V448" stroke="var(--pwr)" stroke-width="3" fill="none"/>
+      <path d="M770 372 V448" stroke="var(--gnd)" stroke-width="2.5" stroke-dasharray="6 4" fill="none"/>
+      <text x="870" y="466" text-anchor="end" font-size="11" fill="var(--ink)">+24 V → amps, 5 V buck (§1)</text>
+      <text x="870" y="482" text-anchor="end" font-size="11" fill="var(--ink)">−V → ★ star point (§2)</text>
+
+      <!-- earth: inlet → PSU earth hole, one continuous wire (printed box, no chassis) -->
+      <path d="M376 280 H420 V400 H700 V300 H720" stroke="var(--pe-g)" stroke-width="3.5" fill="none"/>
+      <path d="M376 280 H420 V400 H700 V300 H720" stroke="var(--pe-y)" stroke-width="3.5" stroke-dasharray="8 8" fill="none"/>
+      <circle cx="470" cy="400" r="6" fill="var(--pe-g)" stroke="var(--panel)" stroke-width="1.5"/>
+      <line x1="470" y1="406" x2="470" y2="416" stroke="var(--pe-g)" stroke-width="2"/>
+      <line x1="452" y1="416" x2="488" y2="416" stroke="var(--pe-g)" stroke-width="2"/>
+      <g stroke="var(--pe-g)" stroke-width="1.6">
+        <line x1="456" y1="416" x2="450" y2="424"/>
+        <line x1="470" y1="416" x2="464" y2="424"/>
+        <line x1="484" y1="416" x2="478" y2="424"/>
+      </g>
+      <text x="470" y="446" text-anchor="middle" font-size="11" font-weight="700" fill="var(--pe-g)">no stud: printed box</text>
+      <text x="470" y="460" text-anchor="middle" font-size="10" fill="var(--muted)">one continuous earth wire, inlet E → PSU ⏚</text>
+
+      <!-- forbidden: earth to −V -->
+      <path d="M700 400 H770" stroke="var(--muted)" stroke-width="1.5" stroke-dasharray="3 3" fill="none"/>
+      <g stroke="var(--pwr)" stroke-width="2.5">
+        <line x1="729" y1="394" x2="741" y2="406"/>
+        <line x1="741" y1="394" x2="729" y2="406"/>
+      </g>
+      <text x="726" y="422" text-anchor="end" font-size="10" font-weight="700" fill="var(--pwr)">no bond (−V to ⏚)</text>
+    </svg>
+    <div class="legend">
+      <span><i class="swatch" style="background:var(--ac-l)"></i>Line (L): brown (older Indian wiring: red)</span>
+      <span><i class="swatch" style="background:var(--ac-n)"></i>Neutral (N): blue (older: black)</span>
+      <span><i class="swatch" style="background:linear-gradient(90deg,var(--pe-g) 50%,var(--pe-y) 50%)"></i>Earth (PE): green/yellow (older: green)</span>
+      <span><i class="swatch" style="height:10px;background:var(--hv-tint);border:1px dashed var(--pwr)"></i>230 V AC zone</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <table style="border-collapse:collapse;font-size:0.86rem;width:100%">
+      <thead>
+        <tr style="text-align:left;color:var(--muted)"><th style="padding:6px 10px">Ref</th><th style="padding:6px 10px">Part</th><th style="padding:6px 10px">Source</th><th style="padding:6px 10px">Notes</th></tr>
+      </thead>
+      <tbody>
+        <tr><td style="padding:6px 10px"><code>J1 F1 S1</code></td><td style="padding:6px 10px">AC-01A module: C14 inlet + 5×20 fuse drawer + illuminated DPST rocker (KCD5 style), 10 A 250 V, two-screw flange</td><td style="padding:6px 10px">Electronic Spices (owned)</td><td style="padding:6px 10px">Rear has three inlet tabs (E, N, fused L) and four switch tabs, with no internal link between the inlet and the switch. Two short jumpers are needed (§5b).</td></tr>
+        <tr><td style="padding:6px 10px"><code>F1</code></td><td style="padding:6px 10px">Fuse, T3.15 A 250 V time-delay, 5×20: Littelfuse 0215 3.15</td><td style="padding:6px 10px">Robu R122855, ₹4.67</td><td style="padding:6px 10px">The drawer is moulded "use only T10A". 10 A only protects against a dead short; fit 3.15 A for this 140 W PSU.</td></tr>
+        <tr><td style="padding:6px 10px"><code>W1</code></td><td style="padding:6px 10px">C13 cord with Indian 3-pin 6 A plug</td><td style="padding:6px 10px">on hand</td><td style="padding:6px 10px">The standard PC or monitor lead.</td></tr>
+        <tr><td style="padding:6px 10px"></td><td style="padding:6px 10px">Insulated female spade crimps, 4.8 mm</td><td style="padding:6px 10px">Robu 1555024 kit, ₹329</td><td style="padding:6px 10px">The seller's drawing gives 4.8 × 0.8 mm tabs. Measure the switch tabs before crimping.</td></tr>
+      </tbody>
+    </table>
+    <p class="note">Starting over without the module: C14 inlet 1676152 + KCD2-201 DPST rocker R133187 + a panel 5×20 holder (Bulgin FX0296, R123158) from Robu, stock checked 2026-10-02.</p>
+  </div>
+
+  <h2>5b · AC-01A module: rear-tab wiring</h2>
+  <p class="note">Seen from inside the box, so the switch is on the left (the mirror of the front). The module has <b>no internal link between the inlet and the switch</b>; two short jumpers make the chain. The tab layout comes from the seller's photos (Electronic Spices AC-01A, 2026-10-02). <b>Your unit may differ, so the tests below decide, not this drawing.</b></p>
+  <div class="card">
+    <svg viewBox="0 52 900 448" role="img" aria-label="AC-01A rear tabs: fused L and N jumpered to the switch inputs, switch outputs to PSU, earth straight to the PSU earth hole">
+      <text x="275" y="70" text-anchor="middle" font-size="12" font-weight="700" fill="var(--ink)">AC-01A rear (inside the box)</text>
+      <rect x="60" y="80" width="430" height="310" rx="14" fill="var(--box-fill)" stroke="var(--line)" stroke-width="1.6"/>
+
+      <!-- row tags -->
+      <text x="52" y="184" text-anchor="end" font-size="10" font-weight="700" fill="var(--muted)">IN row</text>
+      <text x="52" y="197" text-anchor="end" font-size="9" fill="var(--muted)">supply</text>
+      <text x="52" y="264" text-anchor="end" font-size="10" font-weight="700" fill="var(--muted)">OUT row</text>
+      <text x="52" y="277" text-anchor="end" font-size="9" fill="var(--muted)">load+lamp</text>
+
+      <!-- switch block -->
+      <text x="160" y="100" text-anchor="middle" font-size="10" font-weight="700" fill="var(--ink)">switch: illuminated DPST</text>
+      <rect x="80" y="110" width="160" height="190" rx="8" fill="var(--panel)" stroke="var(--box)" stroke-width="1.4"/>
+      <line x1="125" y1="186" x2="125" y2="254" stroke="var(--muted)" stroke-width="1.5" stroke-dasharray="2 4"/>
+      <line x1="195" y1="186" x2="195" y2="254" stroke="var(--muted)" stroke-width="1.5" stroke-dasharray="2 4"/>
+      <text x="160" y="214" text-anchor="middle" font-size="9" fill="var(--muted)">closes when ON</text>
+      <line x1="136" y1="260" x2="153" y2="260" stroke="var(--accent)" stroke-width="1.3"/>
+      <line x1="167" y1="260" x2="184" y2="260" stroke="var(--accent)" stroke-width="1.3"/>
+      <circle cx="160" cy="260" r="7" fill="none" stroke="var(--accent)" stroke-width="1.5"/>
+      <circle cx="157" cy="260" r="1.5" fill="var(--accent)"/>
+      <circle cx="163" cy="260" r="1.5" fill="var(--accent)"/>
+      <text x="160" y="246" text-anchor="middle" font-size="9" fill="var(--accent)">lamp</text>
+      <rect x="114" y="174" width="22" height="12" rx="2" fill="var(--line)"/>
+      <rect x="184" y="174" width="22" height="12" rx="2" fill="var(--line)"/>
+      <rect x="114" y="254" width="22" height="12" rx="2" fill="var(--line)"/>
+      <rect x="184" y="254" width="22" height="12" rx="2" fill="var(--line)"/>
+      <text x="108" y="184" text-anchor="end" font-size="10" fill="var(--ink)">A in</text>
+      <text x="212" y="184" font-size="10" fill="var(--ink)">B in</text>
+      <text x="108" y="264" text-anchor="end" font-size="10" fill="var(--ink)">A out</text>
+      <text x="212" y="264" font-size="10" fill="var(--ink)">B out</text>
+
+      <!-- fuse drawer -->
+      <rect x="250" y="110" width="44" height="190" rx="4" fill="var(--panel)" stroke="var(--box)" stroke-width="1.4"/>
+      <rect x="264" y="160" width="16" height="56" rx="3" fill="none" stroke="var(--ink)" stroke-width="1.3"/>
+      <line x1="272" y1="164" x2="272" y2="212" stroke="var(--ink)" stroke-width="1.1"/>
+      <text transform="translate(261,292) rotate(-90)" font-size="10" fill="var(--muted)">fuse drawer</text>
+      <text transform="translate(291,292) rotate(-90)" font-size="10" font-weight="700" fill="var(--ink)">T3.15 A</text>
+
+      <!-- C14 rear -->
+      <rect x="304" y="110" width="170" height="260" rx="8" fill="var(--panel)" stroke="var(--box)" stroke-width="1.4"/>
+      <text x="389" y="360" text-anchor="middle" font-size="10" fill="var(--muted)">C14 (rear)</text>
+      <rect x="370" y="176" width="86" height="16" rx="8" fill="var(--box)"/>
+      <text x="413" y="206" text-anchor="middle" font-size="9" fill="var(--muted)">internal strap, not a terminal</text>
+      <rect x="324" y="144" width="22" height="12" rx="2" fill="var(--line)"/>
+      <rect x="324" y="222" width="22" height="12" rx="2" fill="var(--line)"/>
+      <rect x="429" y="324" width="22" height="12" rx="2" fill="var(--line)"/>
+      <text x="352" y="154" font-size="10" font-weight="700" fill="var(--ac-l)">L′ (fused)</text>
+      <text x="352" y="232" font-size="10" font-weight="700" fill="var(--ac-n)">N</text>
+      <text x="440" y="318" text-anchor="middle" font-size="10" font-weight="700" fill="var(--pe-g)">E</text>
+
+      <!-- jumpers -->
+      <path d="M324 150 H125 V174" stroke="var(--ac-l)" stroke-width="3" fill="none"/>
+      <path d="M324 228 H195 V186" stroke="var(--ac-n)" stroke-width="3" fill="none"/>
+      <text x="190" y="144" text-anchor="middle" font-size="9" font-weight="700" fill="var(--ac-l)">jumper 1</text>
+      <text x="229" y="222" text-anchor="middle" font-size="9" font-weight="700" fill="var(--ac-n)">jumper 2</text>
+
+      <!-- outputs to PSU -->
+      <path d="M125 266 V460 H700" stroke="var(--ac-l)" stroke-width="3" fill="none"/>
+      <path d="M195 266 V430 H700" stroke="var(--ac-n)" stroke-width="3" fill="none"/>
+      <text x="420" y="424" text-anchor="middle" font-size="10" fill="var(--ac-n)">B out → PSU N</text>
+      <text x="420" y="454" text-anchor="middle" font-size="10" fill="var(--ac-l)">A out → PSU L</text>
+
+      <!-- earth -->
+      <path d="M451 330 H700" stroke="var(--pe-g)" stroke-width="3.5" fill="none"/>
+      <path d="M451 330 H700" stroke="var(--pe-y)" stroke-width="3.5" stroke-dasharray="8 8" fill="none"/>
+      <circle cx="590" cy="330" r="6" fill="var(--pe-g)" stroke="var(--panel)" stroke-width="1.5"/>
+      <line x1="590" y1="336" x2="590" y2="346" stroke="var(--pe-g)" stroke-width="2"/>
+      <line x1="572" y1="346" x2="608" y2="346" stroke="var(--pe-g)" stroke-width="2"/>
+      <g stroke="var(--pe-g)" stroke-width="1.6">
+        <line x1="576" y1="346" x2="570" y2="354"/>
+        <line x1="590" y1="346" x2="584" y2="354"/>
+        <line x1="604" y1="346" x2="598" y2="354"/>
+      </g>
+      <text x="590" y="374" text-anchor="middle" font-size="10" font-weight="700" fill="var(--pe-g)">no stud</text>
+      <text x="590" y="388" text-anchor="middle" font-size="9" fill="var(--muted)">printed box: direct wire</text>
+
+      <!-- PSU -->
+      <rect x="700" y="300" width="170" height="190" rx="8" fill="var(--box-fill)" stroke="var(--pwr)" stroke-width="1.6"/>
+      <text x="800" y="372" text-anchor="middle" font-size="13" font-weight="700" fill="var(--ink)">WX-DC2416</text>
+      <text x="800" y="388" text-anchor="middle" font-size="11" fill="var(--muted)">24 V · 5.5 A</text>
+      <circle cx="700" cy="330" r="4" fill="var(--pe-g)"/>
+      <circle cx="700" cy="430" r="4" fill="var(--ac-n)"/>
+      <circle cx="700" cy="460" r="4" fill="var(--ac-l)"/>
+      <text x="712" y="334" font-size="11" font-weight="700" fill="var(--pe-g)">⏚ hole</text>
+      <text x="712" y="434" font-size="11" font-weight="700" fill="var(--ac-n)">N</text>
+      <text x="712" y="464" font-size="11" font-weight="700" fill="var(--ac-l)">L</text>
+
+      <!-- callout -->
+      <rect x="520" y="80" width="360" height="190" rx="10" fill="var(--hv-tint)" stroke="var(--pwr)" stroke-width="1.2"/>
+      <text x="536" y="104" font-size="11" font-weight="700" fill="var(--pwr)">✕ The one mistake that goes bang</text>
+      <text x="536" y="124" font-size="11" fill="var(--ink)">Never put the two supply jumpers on the same</text>
+      <text x="536" y="140" font-size="11" fill="var(--ink)">pole (A in + A out). Switching on then shorts</text>
+      <text x="536" y="156" font-size="11" fill="var(--ink)">L to N straight through the switch.</text>
+      <text x="536" y="182" font-size="11" font-weight="700" fill="var(--ink)">Find the poles first</text>
+      <text x="536" y="200" font-size="11" fill="var(--ink)">Rocker OFF: no two switch tabs beep.</text>
+      <text x="536" y="216" font-size="11" fill="var(--ink)">Rocker ON: two pairs beep; each pair is a pole.</text>
+      <text x="536" y="232" font-size="11" fill="var(--ink)">Supply goes on one tab of each pole, same row.</text>
+      <text x="536" y="254" font-size="10" fill="var(--muted)">Lamp glowing with the rocker OFF = rows swapped.</text>
+    </svg>
+    <ol class="note">
+      <li><b>Inlet tabs (cord out, fuse in):</b> the C14's centre pin beeps to <b>E</b>. One outer pin beeps straight to <b>N</b>. The other outer pin beeps to <b>L′</b> only while the fuse is in the drawer; pull the fuse and the beep stops. That is how you know which tab is fused.</li>
+      <li><b>Switch poles:</b> with the rocker OFF, no two switch tabs beep. With it ON, exactly two pairs beep. Mark one pair <b>A</b> and the other <b>B</b>.</li>
+      <li><b>Rows:</b> each pole has one tab in each row. Jumper L′ to one tab of A and N to the tab of B <b>in the same row</b>. If the two rows have different spacing, use the closer pair as IN. Run the other row (A out, B out) to the PSU.</li>
+      <li><b>Check before mains (PSU wires not yet on the PSU):</b> with the rocker ON, the front L′ pin should beep to the PSU-L wire end and the front N pin to the PSU-N wire end. <b>The two PSU wire ends must never beep to each other.</b> If they do, a jumper is on the wrong pole. With the rocker OFF, nothing beeps through.</li>
+      <li><b>First power-up:</b> the lamp should light only with the rocker ON. If it glows with the rocker OFF, the IN and OUT rows are swapped. That is harmless, because the switch still breaks both lines, but swap the rows so the lamp means "on".</li>
+      <li><b>Fuse:</b> replace whatever came in the drawer (it is moulded "use only T10A") with a <b>T3.15 A</b> 5×20. Most of these drawers have a second slot for a spare.</li>
+    </ol>
+  </div>
+
+  <h2 id="psu-board">5c · PSU board: WX-DC2416 open frame (Robu 43120)</h2>
+  <p class="note">Top view, drawn to scale from the seller's datasheet (Rev C/D, 2026-10-02). It shows where the switched L/N and earth land, and which parts of the board are live.</p>
+  <div class="card">
+    <svg viewBox="0 0 900 440" role="img" aria-label="WX-DC2416 board: AC terminal top-left, earth mounting hole beside it, primary side live, DC output terminal on the right">
+      <!-- incoming wires -->
+      <path d="M212 2 V56" stroke="var(--ac-l)" stroke-width="3" fill="none"/>
+      <path d="M252 2 V56" stroke="var(--ac-n)" stroke-width="3" fill="none"/>
+      <text x="205" y="14" text-anchor="end" font-size="10" font-weight="700" fill="var(--ac-l)">L from S1</text>
+      <text x="259" y="14" font-size="10" font-weight="700" fill="var(--ac-n)">N from S1</text>
+      <path d="M8 64.5 H163" stroke="var(--pe-g)" stroke-width="3.5" fill="none"/>
+      <path d="M8 64.5 H163" stroke="var(--pe-y)" stroke-width="3.5" stroke-dasharray="8 8" fill="none"/>
+      <text x="8" y="54" font-size="10" font-weight="700" fill="var(--pe-g)">⏚ from inlet E</text>
+      <text x="8" y="96" font-size="10" fill="var(--muted)">metal M4 screw</text>
+      <text x="8" y="110" font-size="10" fill="var(--muted)">+ ring terminal</text>
+      <text x="8" y="124" font-size="10" fill="var(--muted)">+ star washer</text>
+
+      <!-- board + zones -->
+      <rect x="150" y="40" width="574" height="328" rx="6" fill="var(--box-fill)" stroke="var(--line)" stroke-width="1.6"/>
+      <path d="M156 40 H463 V368 H156 a6 6 0 0 1 -6 -6 V46 a6 6 0 0 1 6 -6 Z" fill="var(--hv-tint)"/>
+      <line x1="463" y1="40" x2="463" y2="190" stroke="var(--pwr)" stroke-width="1.2" stroke-dasharray="5 4"/>
+      <line x1="463" y1="330" x2="463" y2="368" stroke="var(--pwr)" stroke-width="1.2" stroke-dasharray="5 4"/>
+      <text x="162" y="140" font-size="11" font-weight="700" fill="var(--pwr)">PRIMARY</text>
+      <text x="162" y="155" font-size="10" fill="var(--pwr)">at mains</text>
+      <text x="162" y="169" font-size="10" fill="var(--pwr)">potential</text>
+      <text x="480" y="110" font-size="11" font-weight="700" fill="var(--ink)">SECONDARY</text>
+      <text x="480" y="125" font-size="10" fill="var(--muted)">24 V side</text>
+
+      <!-- mounting holes -->
+      <circle cx="173" cy="64.5" r="10" fill="var(--panel)" stroke="var(--pe-g)" stroke-width="3"/>
+      <circle cx="173" cy="64.5" r="4" fill="var(--pe-g)"/>
+      <circle cx="701" cy="64.5" r="10" fill="var(--panel)" stroke="var(--muted)" stroke-width="1.5"/>
+      <circle cx="173" cy="343.5" r="10" fill="var(--panel)" stroke="var(--muted)" stroke-width="1.5"/>
+      <circle cx="701" cy="343.5" r="10" fill="var(--panel)" stroke="var(--muted)" stroke-width="1.5"/>
+      <text x="701" y="92" text-anchor="middle" font-size="9" fill="var(--muted)">nylon</text>
+      <text x="190" y="347" font-size="9" fill="var(--muted)">nylon</text>
+      <text x="701" y="326" text-anchor="middle" font-size="9" fill="var(--muted)">nylon</text>
+
+      <!-- AC terminal -->
+      <rect x="191" y="46" width="82" height="42" rx="3" fill="var(--box)" stroke="var(--line)" stroke-width="1.3"/>
+      <circle cx="212" cy="67" r="11" fill="var(--panel)" stroke="var(--line)" stroke-width="1.3"/>
+      <circle cx="252" cy="67" r="11" fill="var(--panel)" stroke="var(--line)" stroke-width="1.3"/>
+      <text x="232" y="104" text-anchor="middle" font-size="10" font-weight="700" fill="var(--ink)">AC 220V</text>
+      <text x="232" y="117" text-anchor="middle" font-size="9" fill="var(--muted)">unmarked, either way</text>
+
+      <!-- primary heatsink, bulk cap -->
+      <rect x="300" y="55" width="36" height="200" rx="2" fill="var(--box)" stroke="var(--muted)" stroke-width="1.2"/>
+      <text x="344" y="74" font-size="10" font-weight="700" fill="var(--pwr)">heatsink:</text>
+      <text x="344" y="88" font-size="10" font-weight="700" fill="var(--pwr)">treat as live</text>
+      <circle cx="300" cy="318" r="28" fill="var(--panel)" stroke="var(--pwr)" stroke-width="1.5"/>
+      <text x="300" y="322" text-anchor="middle" font-size="9" fill="var(--pwr)">bulk cap</text>
+      <text x="162" y="270" font-size="10" fill="var(--pwr)">holds ≈325 V DC</text>
+      <text x="162" y="284" font-size="10" fill="var(--pwr)">after unplugging:</text>
+      <text x="162" y="298" font-size="10" fill="var(--pwr)">wait, then measure</text>
+
+      <!-- transformer -->
+      <rect x="400" y="190" width="126" height="140" rx="6" fill="var(--pwr5)" fill-opacity="0.22" stroke="var(--pwr5)" stroke-width="1.4"/>
+      <text x="463" y="258" text-anchor="middle" font-size="10" fill="var(--ink)">transformer</text>
+      <text x="463" y="272" text-anchor="middle" font-size="9" fill="var(--muted)">isolation barrier</text>
+
+      <!-- secondary heatsinks -->
+      <rect x="585" y="48" width="95" height="14" rx="2" fill="var(--box)" stroke="var(--muted)" stroke-width="1"/>
+      <rect x="585" y="346" width="95" height="14" rx="2" fill="var(--box)" stroke="var(--muted)" stroke-width="1"/>
+      <text x="632" y="80" text-anchor="middle" font-size="9" fill="var(--muted)">output heatsink</text>
+
+      <!-- DC out (Rev C, 4-way) -->
+      <rect x="672" y="130" width="36" height="105" rx="3" fill="var(--low)" fill-opacity="0.2" stroke="var(--low)" stroke-width="1.4"/>
+      <circle cx="690" cy="143" r="8" fill="var(--panel)" stroke="var(--line)" stroke-width="1.2"/>
+      <circle cx="690" cy="169" r="8" fill="var(--panel)" stroke="var(--line)" stroke-width="1.2"/>
+      <circle cx="690" cy="195" r="8" fill="var(--panel)" stroke="var(--line)" stroke-width="1.2"/>
+      <circle cx="690" cy="221" r="8" fill="var(--panel)" stroke="var(--line)" stroke-width="1.2"/>
+      <text x="662" y="160" text-anchor="end" font-size="12" font-weight="700" fill="var(--pwr)">+</text>
+      <text x="662" y="212" text-anchor="end" font-size="12" font-weight="700" fill="var(--gnd)">−</text>
+      <text x="690" y="250" text-anchor="middle" font-size="9" fill="var(--muted)">DC out, Rev C</text>
+      <text x="690" y="262" text-anchor="middle" font-size="9" fill="var(--muted)">check silkscreen</text>
+      <path d="M708 156 H780" stroke="var(--pwr)" stroke-width="3" fill="none"/>
+      <path d="M708 208 H780" stroke="var(--gnd)" stroke-width="2.5" stroke-dasharray="6 4" fill="none"/>
+      <text x="786" y="152" font-size="10" fill="var(--ink)">+24 V →</text>
+      <text x="786" y="166" font-size="10" fill="var(--ink)">amp fuses, buck</text>
+      <text x="786" y="204" font-size="10" fill="var(--ink)">−V →</text>
+      <text x="786" y="218" font-size="10" fill="var(--ink)">star bus (§2)</text>
+
+      <!-- footer -->
+      <text x="150" y="392" font-size="10" fill="var(--muted)">Board 114.8 × 65.5 × 35.2 mm · holes 105.6 × 55.7 mm, M4 · Rev D has a green 2-way DC block (+ top, − bottom).</text>
+      <text x="150" y="408" font-size="10" fill="var(--muted)">Datasheet: 85–265 V in · 24 V ±5 % · 5.5 A nominal, 6 A peak · rated 140 W · 82 % efficient · 170 mV p-p ripple.</text>
+    </svg>
+    <ul class="note">
+      <li><b>Earth:</b> put a metal M4 screw through the ⏚ hole beside the AC terminal, with the ring terminal and a star washer. The silkscreen ⏚ and the filter capacitors next to it mark this as the board's earth point. The enclosure is 3D-printed, so the inlet's E runs straight here as one wire.</li>
+      <li><b>Other three holes:</b> use nylon standoffs and nylon screws. If one of them connects to −V, a metal standoff on an earthed panel would bond −V to earth, which is the hum loop §5 forbids. Meter each hole against −V and against both AC pins before trusting metal hardware.</li>
+      <li><b>AC terminal:</b> it is unmarked ("AC 220V") and works either way round, because it feeds an EMI filter and then a bridge rectifier. Use bootlace ferrules on stranded wire, not tinned ends: solder creeps under a screw clamp and the joint works loose.</li>
+      <li><b>Live areas:</b> everything on the AC side of the transformer is at mains potential, including that side's heatsink. The bulk capacitor holds about 325 V DC after unplugging, so wait a few minutes and measure across it before touching. Keep at least 6 mm of air between the primary side and anything conductive. Fit an insulating cover or a vented printed shroud so a dropped screw or loose wire inside the box can't reach it.</li>
+      <li><b>Heat:</b> at 82 % efficiency the board sheds about 30 W at 140 W out (far less on average with music). The datasheet rates it for −5 to 40 °C ambient with 5 W/°C derating. Vent the box at the board, keep the fins vertical and keep it away from the DAC and ESP32.</li>
+      <li><b>DC side:</b> on the Rev C block, use both + and both − positions. Don't land the eight star-ground home-runs in the PSU's terminal. Run one short heavy pair to a star bus (a single bolt or bus bar) and terminate them there; it is still one point (§2).</li>
+      <li><b>First power-up:</b> no load, amps disconnected. Measure 22.8–25.2 V (24 V ±5 %) at the DC block and confirm polarity before connecting anything.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <ul class="note">
+      <li><b>C13 vs C14:</b> the box gets the <b>C14</b> (male pins) and the cord ends in a <b>C13</b> (female). With the cord out, the box's pins are dead. Never reverse this by putting a female socket on the box.</li>
+      <li><b>Order is inlet → fuse → switch → PSU, with the fuse on L.</b> F1 protects the inlet, the switch and the internal wiring. The PSU has its own internal fuse.</li>
+      <li><b>Why T3.15 A slow-blow:</b> 140 W out at the PSU's 82 % efficiency is about 170 W in. With no PFC (power factor about 0.5–0.6), that is roughly 1.2–1.5 A RMS at 230 V. Cold-start inrush is tens of amps for a few milliseconds, so a fast fuse this small blows on switch-on. This is <b>not</b> the 8 A fuse in WIRING.md, which sits on the 24 V DC side.</li>
+      <li><b>Why DPST:</b> Indian outlets are often wired with L and N swapped. A single-pole switch could then sit in neutral and leave the PSU primary live while "off". DPST breaks both.</li>
+      <li><b>Find L at the inlet by continuity, not by pin position.</b> Plug the cord into J1 (not the wall). Beep the plug's L pin against the inlet tabs and mark the tab that beeps as L. Check the wall socket's polarity with a tester; the plug-face L/N drawn above is convention only.</li>
+      <li><b>Earth:</b> the enclosure is 3D-printed, so there is no chassis to earth. Run one continuous green/yellow wire from J1's E tab to the PSU's ⏚ mounting hole (§5c), ring terminal at the PSU end. Bond any metal a finger can touch from outside to that same wire, for example a metal rear plate or screws that pass through to metal inside. Plastic-only screws and the plastic inlet body need nothing.</li>
+      <li><b>Printed box:</b> print it in PETG, ABS or ASA, not PLA. PLA softens at about 55–60 °C, and the PSU (about 30 W of heat at full load) and the amps sit in the same box. A printed wall is not flame-rated. Give the PSU a printed or polycarbonate shroud, leave vents above and below it, and keep its primary side clear of the walls. Screw the AC-01A's flange through heat-set brass inserts, not self-tapped plastic, so the inlet can't loosen when the cord is pulled. Tie the mains wires down near each terminal so a wire that comes loose can't swing onto the 24 V or logic side.</li>
+      <li><b>Never bond −V to earth.</b> The USB-C cable already ties DC ground to the PC's earthed chassis. A second bond here creates an earth loop, which hums. Earth on this side is for safety only, and the star point stays at PSU −V (§2).</li>
+      <li><b>PSU:</b> WX-DC2416 open frame (Robu 43120). Input is universal 85–265 V, so there is no voltage selector. Its earth point is the ⏚-marked M4 mounting hole; mounting, live areas and heat are in §5c.</li>
+      <li><b>Wire:</b> 0.75–1.0 mm² multi-strand, mains-rated (1100 V house flex is fine). Keep the run short and along the panel, away from the I2S and analog wiring. Use fully insulated spades or heat-shrink on every tab.</li>
+      <li><b>Before first power (cord unplugged):</b> plug earth pin to the PSU's ⏚ hole should read under 1 Ω. L to ⏚ and N to ⏚ should read open with the switch both on and off. Do the first power-up with the amps disconnected and measure 24 V at the PSU.</li>
+    </ul>
+  </div>
+
   <h2>Power budget reminder</h2>
-  <p class="note">150W ÷ 24V = <b>6.25A continuous</b>. 4 amps × 60W = 240W = 10A if all peaked together — over budget. Fine for music (crest factor), <b>not</b> for simultaneous full-power test tones on all 4 channels. Main fuse 8A slow-blow catches faults, not routine headroom.</p>
+  <p class="note">The WX-DC2416 gives <b>5.5 A nominal, 6 A peak</b> (rated 140 W). Four amps at nameplate would draw 10 A, but the 8 Ω woofer amps clip at about 25–30 W on 24 V (about 1.4 A each), and tweeters take a small share of music power. Music fits; full-power test tones on all four channels do not. Past 6 A the PSU's overcurrent protection cuts the rail, so the sound drops out and pops instead of sagging. The 8 A main fuse sits above that 6 A, so it can only catch a PSU whose protection has failed. The 3 A branch fuses still matter, because one faulty amp drawing 4 A would not trip the PSU.</p>
 </div>

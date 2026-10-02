@@ -16,9 +16,10 @@
 - **Amps:** 4x TPA3118/TPA3116 mono (single-channel) boards, one per driver.
 - **Drivers:** 2-way stereo, 4 drivers total (L-woofer, L-tweeter, R-woofer,
   R-tweeter).
-- **PSU:** single 24V / 150W DC supply, shared by all 4 amps; stepped down
-  for logic. See the power budget check below — 150W does not cover all
-  4 amps at full rated 60W simultaneously.
+- **PSU:** one 24 V open-frame supply shared by all 4 amps, stepped down
+  for logic: **WX-DC2416** (Robu 43120). It gives 5.5 A nominal and 6 A peak,
+  is rated 140 W (150 W max) and is 82 % efficient. See the budget below: it
+  does not cover all 4 amps at full rated 60 W at once.
 
 **Full schematic + dedicated ground-path diagram:** [schematic.html](schematic.html)
 (open in a browser). This file covers the block diagram, pin tables, and
@@ -108,7 +109,7 @@ to the silent port — if it plays there, the fault is in the other module.
 
 ## Power distribution and budget
 
-- **24V/150W PSU → straight to all 4 amp boards' VIN**, heavy gauge, short
+- **24 V PSU → straight to all 4 amp boards' VIN**, heavy gauge, short
   runs, main input fused at ~8A slow-blow. Each amp branch individually
   fused at ~3A.
 - **24V → buck converter → 5V rail** for ESP32-S3 and both PCM5102 boards'
@@ -117,14 +118,79 @@ to the silent port — if it plays there, the fault is in the other module.
 - Decouple each amp board's power input locally (bulk cap close to the
   board) rather than relying on the shared rail alone.
 
-**Budget check:** 150W ÷ 24V = 6.25A the PSU can supply continuously. Each
-amp at its full rated 60W draws 2.5A, so 4 channels at full rated power
-simultaneously would ask for 10A — over budget by ~60%. In practice music
-has enough crest factor that all 4 channels rarely peak together, so this
-is a livable soft limit, not a bench-fire risk, but it means: don't expect
-sustained full-rated-power on all 4 channels at once (e.g. test tones on
-every channel simultaneously will sag the rail), and the main 8A fuse is
-there to catch a real fault, not routine headroom use.
+**Budget check (WX-DC2416, datasheet values):** 5.5 A nominal, 6 A peak.
+Four amps at their full rated 60 W would ask for 10 A, about 80 % over.
+
+The real ceiling is lower than nameplate. The 8 Ω woofer amps clip at about
+25–30 W on 24 V (see TASKS.md), which is about 1.4 A each, and tweeters take a
+small share of music power. So loud music fits. Sustained test tones at full
+power on every channel do not.
+
+What overload does is the important part: past 6 A the PSU's overcurrent
+protection cuts the rail. The sound drops out and pops; it does not sag
+gently.
+
+The main 8 A fuse sits above that 6 A, so it can only catch a PSU whose own
+protection has failed. The 3 A branch fuses still matter, because one faulty
+amp drawing 4 A would not trip the PSU.
+
+## Mains input (AC side)
+
+Drawn 2026-10-02; not built yet. Diagrams and checks are in
+[schematic.html §5 and §5b](schematic.html#mains).
+
+J1, F1 and S1 are a single part already owned: an **Electronic Spices AC-01A**
+three-in-one module (C14 inlet, 5×20 fuse drawer, illuminated DPST rocker).
+
+```
+Indian 3-pin plug ─ C13 cord ═╪═ C14 inlet (J1) ─L─ F1 T3.15A ─┬─ S1 DPST ─L─ PSU L
+                              │                 ─N─────────────┴─ S1 DPST ─N─ PSU N
+                           panel                ─⏚─────────────────────────── PSU ⏚ hole
+```
+
+**AC-01A rear tabs.** Three inlet tabs (E, N, fused L′) and four switch tabs
+(two poles × IN/OUT rows; the lamp sits across the OUT row). There is **no
+internal link** from the inlet to the switch, so wire it like this:
+
+- **Jumper 1:** L′ → switch pole A, IN row.
+- **Jumper 2:** N → switch pole B, IN row.
+- **To the PSU:** A OUT → PSU L, B OUT → PSU N.
+- **Earth:** E → the PSU's ⏚ mounting hole, one continuous wire (the box
+  is 3D-printed, so there is no chassis stud).
+
+Identify the tabs by meter, not by drawing:
+
+- **L′ is the fused tab.** It beeps to a C14 front pin only while the fuse is
+  in the drawer.
+- **The poles are the tab pairs that beep with the rocker ON.**
+- **Never put the two supply jumpers on the same pole.** Switching on would
+  then short L to N.
+
+The drawer is moulded "use only T10A"; fit T3.15 A instead.
+
+- **The box gets a C14 (male) inlet; the cord brings the C13 (female) end.**
+- **F1 is T3.15 A slow-blow, 5×20 mm, on L, ahead of the switch.** 140 W
+  out at 82 % efficiency is about 170 W in, roughly 1.2–1.5 A RMS at 230 V with no PFC. Cold-start
+  inrush blows a fast fuse this small. Don't confuse F1 with the **8 A fuse
+  above**: that one is on the 24 V DC output.
+- **S1 must be DPST.** Indian outlets are often wired with L and N swapped, so a
+  single-pole switch could leave the PSU primary live while "off".
+- **Find J1's L tab by continuity from the plug's L pin.** Don't assume a pin
+  position.
+- **Earth goes J1 → PSU ⏚ hole as one wire; the enclosure is 3D-printed, so
+  there is no chassis. Bond any externally touchable metal to it. Never bond PSU −V to earth.** The
+  USB-C link already grounds −V through the PC's chassis, so a second bond
+  makes a hum loop.
+- **The PSU is open frame (WX-DC2416), with universal 85–265 V input and no
+  selector.** Its earth point is the ⏚-marked M4 hole beside the AC terminal.
+  The other three holes take nylon hardware. Everything on the AC side of the
+  transformer is live, including that side's heatsink and the bulk capacitor,
+  which holds about 325 V after unplugging. Details are in
+  [schematic.html §5c](schematic.html#psu-board).
+- **The enclosure is 3D-printed: use PETG, ABS or ASA, not PLA.** PLA softens
+  at about 55–60 °C, next to a PSU shedding about 30 W at full load. A printed wall
+  is not flame-rated, so shroud the PSU and vent it top and bottom. Mount the inlet
+  on heat-set inserts, and tie the mains wires down near each terminal.
 
 ## Audio source options & quality ceilings
 
@@ -301,5 +367,5 @@ wires (ESP32, DAC-LOW, DAC-HIGH, Amp1–4) all meeting at that one point.
 - [ ] Confirm TPA3118/TPA3116 board: single-ended vs differential input,
       and max supply voltage rating vs the 24V rail.
 - [ ] If sustained full-power on all 4 channels turns out to matter, revisit
-      the 150W PSU — it's sized for typical/dynamic use, not simultaneous
+      the 140 W PSU — it's sized for typical/dynamic use, not simultaneous
       full-rated draw on every channel.

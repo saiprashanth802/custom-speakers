@@ -2,7 +2,7 @@
 
 A standalone box that takes USB audio from a PC and drives two passive-free
 cabinets over NL4 cables: **active 2-way stereo crossover on an ESP32-S3, two
-PCM5102 DACs, four TPA3118 mono class-D amps, 24 V 150 W AC-DC supply**,
+PCM5102 DACs, four TPA3118 mono class-D amps, 24 V open-frame AC-DC supply (WX-DC2416, 5.5 A)**,
 controlled from a Windows companion app over BLE.
 
 ```
@@ -35,9 +35,9 @@ controlled from a Windows companion app over BLE.
 | DSP / USB / BLE | ESP32-S3 Mini | dual core: core 1 = audio only, core 0 = USB, BLE, NVS |
 | DACs | 2× CJMCU-5102 (PCM5102) | split **by band**, not by side: one DAC = both woofers, the other = both tweeters, so the noise-sensitive high path never shares a converter with the high-current low path. Straps: SCK→GND (wire), FMT/FLT/DEMP = L, XSMT = H |
 | Amps | 4× TPA3118D2 mono | one per driver; BTL outputs (no leg is ground); mute via one NPN per board on GPIO 10–13 |
-| PSU | 24 V / 150 W AC-DC | shared by the four amps; buck to 5 V for logic. 150 W is ~60 % of four amps at full rating — fine for music, not for four simultaneous test tones |
+| PSU | 24 V open-frame AC-DC, WX-DC2416 (Robu 43120): 5.5 A nominal, 6 A peak, rated 140 W | shared by the four amps; buck to 5 V for logic. Fine for music; not for full-power test tones on all four channels, which trip its overcurrent protection |
 | Output | 2× NL4 chassis sockets | 1± = woofer, 2± = tweeter |
-| Enclosure | custom | amps + PSU + logic in one box; power tier above the logic board, **star ground** to the PSU negative |
+| Enclosure | custom, 3D-printed (PETG/ABS/ASA, not PLA) | amps + PSU + logic in one box; mains earth runs inlet → PSU directly (no chassis); power tier above the logic board, **star ground** to the PSU negative |
 
 Into 8 Ω on a 24 V rail the TPA3118 is voltage-limited to **~25–30 W per
 channel**. That, not the drivers, is the system's loudness ceiling.
