@@ -92,6 +92,11 @@ constexpr float    TONE_AMP    = 0.20f;   // each tone; sum stays < 1.0
 // ---- LR4 constant: two cascaded Butterworth sections, Q = 1/sqrt(2) ---------
 constexpr float BUTTER_Q = 0.70710678f;
 
+// Crossover range a real setting can take (= the app slider, 500..6000 Hz). The
+// app's full-range check parks the crossover at 20 kHz (tweeters silent); that is
+// a bench mode, so a value above the range is not restored at boot.
+constexpr float XOVER_MIN_HZ = 500.0f, XOVER_MAX_HZ = 6000.0f, XOVER_DEFAULT_HZ = 2500.0f;
+
 I2SClass i2sLow;
 I2SClass i2sHigh;
 
@@ -199,11 +204,14 @@ static void buildInto(Compiled& C, const Params& p) {
   C.preampLin = dB2lin(p.voicingPreampDb);
   bq += C.voicingCount * 2;
 
+  // Tweeter protection: never design the high-pass below the app slider's floor,
+  // whatever arrives over BLE or out of NVS.
+  float xo = p.crossoverHz < XOVER_MIN_HZ ? XOVER_MIN_HZ : p.crossoverHz;
   for (int s = 0; s < 2; s++) {
-    designBiquad(C.lpL[s], FT_LOWPASS,  fs, p.crossoverHz, BUTTER_Q, 0);
-    designBiquad(C.hpL[s], FT_HIGHPASS, fs, p.crossoverHz, BUTTER_Q, 0);
-    designBiquad(C.lpR[s], FT_LOWPASS,  fs, p.crossoverHz, BUTTER_Q, 0);
-    designBiquad(C.hpR[s], FT_HIGHPASS, fs, p.crossoverHz, BUTTER_Q, 0);
+    designBiquad(C.lpL[s], FT_LOWPASS,  fs, xo, BUTTER_Q, 0);
+    designBiquad(C.hpL[s], FT_HIGHPASS, fs, xo, BUTTER_Q, 0);
+    designBiquad(C.lpR[s], FT_LOWPASS,  fs, xo, BUTTER_Q, 0);
+    designBiquad(C.hpR[s], FT_HIGHPASS, fs, xo, BUTTER_Q, 0);
   }
   bq += 8;
 
@@ -819,6 +827,15 @@ void setup() {
   if (loadParamsBlob("params", params, 0))  // restore saved boot default, INCLUDING its rate
     Serial.printf("[dsp_engine] restored params from NVS (saved rate %lu Hz)\n",
                   (unsigned long)params.sampleRate);
+  if (params.crossoverHz < XOVER_MIN_HZ || params.crossoverHz > XOVER_MAX_HZ) {
+    Serial.printf("[dsp_engine] saved crossover %.0f Hz out of range (full-range check?) -> %.0f Hz\n",
+                  params.crossoverHz, XOVER_DEFAULT_HZ);
+    params.crossoverHz = XOVER_DEFAULT_HZ;
+  }
+  Serial.printf("[dsp_engine] crossover %.0f Hz | master %.2f | level dB Lw %.1f Rw %.1f Lt %.1f Rt %.1f\n",
+                params.crossoverHz, params.masterGain,
+                params.driver[0].levelDb, params.driver[1].levelDb,
+                params.driver[2].levelDb, params.driver[3].levelDb);
   // Boot straight into the saved profile: no mute/switch cycle, I2S comes up at
   // that rate. g_sampleRate must be final before audioTask starts (it derives
   // the tone increments from it once).
