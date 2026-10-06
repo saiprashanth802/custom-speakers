@@ -150,9 +150,9 @@
 
               <Grid Margin="0,0,0,4">
                 <TextBlock Text="Master" Foreground="{StaticResource Muted}" FontSize="11"/>
-                <TextBlock Text="{Binding MasterPct, StringFormat='{}{0:0} %'}" Style="{StaticResource Mono}" HorizontalAlignment="Right"/>
+                <TextBlock Text="{Binding MasterDb, StringFormat='{}{0:0.0} dB'}" Style="{StaticResource Mono}" HorizontalAlignment="Right"/>
               </Grid>
-              <Slider Minimum="0" Maximum="100" Value="{Binding MasterPct}"/>
+              <Slider Minimum="-60" Maximum="0" Value="{Binding MasterDb}" SmallChange="0.5" LargeChange="3"/>
 
               <Button Content="Save to device" Style="{StaticResource Accented}" Command="{Binding SaveNvsCommand}"
                       HorizontalAlignment="Left" Margin="0,14,0,0" ToolTip="Persist the current tuning as the boot default (NVS)"/>

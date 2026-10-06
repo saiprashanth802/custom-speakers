@@ -66,7 +66,10 @@ public sealed class DriverBandRow : Bindable
 
     public DriverBandRow(int drv, int idx, Func<Frame, Task> send) { _drv = drv; _idx = idx; _send = send; }
     public string Label => $"Band {_idx + 1}";
-    public static IReadOnlyList<FilterType> Types => BandRow.Types;
+    // Driver bands also offer a high-pass (e.g. a woofer subsonic filter); the
+    // firmware designs any FilterType per band. Gain is ignored for HighPass.
+    public static IReadOnlyList<FilterType> Types { get; } =
+        new[] { FilterType.PK, FilterType.LowShelf, FilterType.HighShelf, FilterType.HighPass };
 
     private bool _enabled;
     public bool Enabled { get => _enabled; set { if (Set(ref _enabled, value)) Push(); } }

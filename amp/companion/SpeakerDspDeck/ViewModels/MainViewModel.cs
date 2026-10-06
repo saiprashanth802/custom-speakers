@@ -200,12 +200,26 @@ public sealed class MainViewModel : Bindable
         set => SelectedProfile = value ? Profile.HiRes : Profile.Normal;
     }
 
-    // 0..100 for the slider; sent as 0..1 linear.
+    // Linear gain x100, sent as 0..1 linear; this is what presets store and the
+    // device reads back. The slider binds MasterDb instead: a linear slider put
+    // the whole audible range in its bottom third (70 % was only -3 dB).
     private double _master = 50;
     public double MasterPct
     {
         get => _master;
-        set { if (Set(ref _master, value) && !_silent) _ = _ble.Send(Frame.Cmd(CmdOp.SetMasterGain).F32((float)(value / 100.0))); }
+        set
+        {
+            if (!Set(ref _master, value)) return;
+            Raise(nameof(MasterDb));
+            if (!_silent) _ = _ble.Send(Frame.Cmd(CmdOp.SetMasterGain).F32((float)(value / 100.0)));
+        }
+    }
+
+    public const double MasterFloorDb = -60;   // slider bottom = off
+    public double MasterDb
+    {
+        get => _master <= 0 ? MasterFloorDb : Math.Max(MasterFloorDb, 20 * Math.Log10(_master / 100.0));
+        set => MasterPct = value <= MasterFloorDb ? 0 : Math.Round(100 * Math.Pow(10, value / 20), 2);
     }
 
     private bool _muted;
